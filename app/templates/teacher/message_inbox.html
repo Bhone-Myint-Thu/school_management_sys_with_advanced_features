@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block page_title %}Inbox{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="panel-title-row">
+    <h2>Inbox</h2>
+    <a class="btn btn-primary" href="{{ url_for('teacher.message_send') }}">Send Message</a>
+  </div>
+  <div class="message-list">
+    {% for msg in inbox %}<article><div class="message-icon">✉</div><div><strong>{{ msg.subject }}</strong><small>From {{ msg.sender.display_name }} · {{ msg.sent_at.strftime("%Y-%m-%d") }}</small><p>{{ msg.body }}</p></div></article>{% else %}<p class="text-muted">No messages yet.</p>{% endfor %}
+  </div>
+</section>
+{% endblock %}

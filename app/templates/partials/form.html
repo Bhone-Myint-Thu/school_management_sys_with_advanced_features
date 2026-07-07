@@ -1,0 +1,17 @@
+{{ form.hidden_tag() }}
+{% for field in form if field.type not in ["CSRFTokenField", "SubmitField"] %}
+  <div class="form-field">
+    {{ field.label(class="form-label") }}
+    {% if field.type == "SelectField" or field.type == "SelectMultipleField" %}
+      {{ field(class="form-select") }}
+    {% elif field.type == "TextAreaField" %}
+      {{ field(class="form-control", rows=5) }}
+    {% else %}
+      {{ field(class="form-control") }}
+    {% endif %}
+    {% for error in field.errors %}
+      <div class="form-text text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+{% endfor %}
+{{ form.submit(class="btn btn-primary") }}

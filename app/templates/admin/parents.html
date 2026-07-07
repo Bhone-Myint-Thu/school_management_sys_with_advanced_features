@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block page_title %}Parents{% endblock %}
+{% block content %}
+<div class="toolbar"><div></div><a class="btn btn-primary" href="{{ url_for('admin.parent_create') }}">Add Parent</a></div>
+<section class="panel">
+  <table class="table">
+    <thead><tr><th>Name</th><th>Phone</th><th>Address</th><th>Children</th><th></th></tr></thead>
+    <tbody>
+    {% for parent in parents %}
+      <tr>
+        <td><a class="table-link" href="{{ url_for('admin.parent_detail', parent_id=parent.id) }}">{{ parent.full_name }}</a><small>{{ parent.user.email }}</small></td>
+        <td>{{ parent.phone }}</td>
+        <td>{{ parent.address }}</td>
+        <td>{{ parent.students|map(attribute="full_name")|join(", ") or "No children linked" }}</td>
+        <td class="actions"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.parent_edit', parent_id=parent.id) }}">Edit</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

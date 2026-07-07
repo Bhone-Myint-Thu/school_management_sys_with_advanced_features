@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block page_title %}Leave Request Detail{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="panel-title-row">
+    <div><h2>{{ leave_request.student.full_name }}</h2><p class="subtle">{{ leave_request.start_date }} to {{ leave_request.end_date }}</p></div>
+    <span class="badge status-{{ leave_request.status }}">{{ leave_request.status|title }}</span>
+  </div>
+  <div class="detail-grid">
+    <div><span>Requested By</span><strong>{{ leave_request.requested_by.display_name }}</strong></div>
+    <div><span>Class</span><strong>{{ leave_request.student.classes|map(attribute="name")|join(", ") }}</strong></div>
+    <div><span>Reason</span><strong>{{ leave_request.reason }}</strong></div>
+    <div><span>Response</span><strong>{{ leave_request.response_note or "No response yet" }}</strong></div>
+  </div>
+</section>
+<section class="panel narrow">
+  <h2>Decision</h2>
+  <form method="post" action="{{ url_for('admin.leave_decision', leave_id=leave_request.id) }}">{% include "partials/form.html" %}</form>
+</section>
+{% endblock %}

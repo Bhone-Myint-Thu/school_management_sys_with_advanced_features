@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block page_title %}Parent Record{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="panel-title-row">
+    <div><h2>{{ parent.full_name }}</h2><p class="subtle">{{ parent.relationship or "Parent" }} · {{ parent.user.email }}</p></div>
+    <a class="btn btn-primary" href="{{ url_for('admin.parent_edit', parent_id=parent.id) }}">Edit Parent</a>
+  </div>
+  <div class="detail-grid">
+    <div><span>Phone</span><strong>{{ parent.phone or "Not recorded" }}</strong></div>
+    <div><span>Emergency Contact</span><strong>{{ parent.emergency_contact or "Not recorded" }}</strong></div>
+    <div><span>Address</span><strong>{{ parent.address or "Not recorded" }}</strong></div>
+    <div><span>Children</span><strong>{{ parent.students|map(attribute="full_name")|join(", ") }}</strong></div>
+  </div>
+</section>
+<section class="panel">
+  <h2>Children</h2>
+  <table class="table">
+    <thead><tr><th>Name</th><th>Grade</th><th>Classes</th><th>Attendance</th></tr></thead>
+    <tbody>{% for child in parent.students %}<tr><td><a class="table-link" href="{{ url_for('admin.student_detail', student_id=child.id) }}">{{ child.full_name }}</a></td><td>{{ child.year_group }}</td><td>{{ child.classes|map(attribute="name")|join(", ") }}</td><td>{{ child.attendance_percentage }}%</td></tr>{% endfor %}</tbody>
+  </table>
+</section>
+{% endblock %}

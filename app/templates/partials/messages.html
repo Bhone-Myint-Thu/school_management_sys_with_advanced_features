@@ -1,0 +1,30 @@
+<h2>Inbox</h2>
+<div class="message-list">
+  {% for msg in inbox %}
+    <article>
+      <div class="message-icon">✉</div>
+      <div>
+      <strong>{{ msg.subject }}</strong>
+      <small>From {{ msg.sender.display_name }} · {{ msg.sent_at.strftime("%Y-%m-%d") }}</small>
+      <p>{{ msg.body }}</p>
+      </div>
+    </article>
+  {% else %}
+    <p class="text-muted">No messages yet.</p>
+  {% endfor %}
+</div>
+<h2 class="mt-4">Sent</h2>
+<div class="message-list">
+  {% for msg in sent %}
+    <article>
+      <div class="message-icon">↗</div>
+      <div>
+      <strong>{{ msg.subject }}</strong>
+      <small>To {{ msg.recipient.display_name }} · {{ msg.sent_at.strftime("%Y-%m-%d") }}</small>
+      <p>{{ msg.body }}</p>
+      </div>
+    </article>
+  {% else %}
+    <p class="text-muted">No sent messages yet.</p>
+  {% endfor %}
+</div>

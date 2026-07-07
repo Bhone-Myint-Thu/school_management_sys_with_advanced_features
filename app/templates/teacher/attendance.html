@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block page_title %}Attendance{% endblock %}
+{% block content %}
+<div class="grid-2">
+  <section class="panel">
+    <h2>Mark Attendance</h2>
+    <form method="post">{% include "partials/form.html" %}</form>
+  </section>
+  <section class="panel">
+    <h2>Recent Records</h2>
+    <table class="table">
+      <thead><tr><th>Date</th><th>Student</th><th>Class</th><th>Status</th></tr></thead>
+      <tbody>{% for row in records %}<tr><td>{{ row.session_date }}</td><td>{{ row.student.full_name }}</td><td>{{ row.school_class.name }}</td><td><span class="badge status-{{ row.status }}">{{ row.status|title }}</span></td></tr>{% endfor %}</tbody>
+    </table>
+  </section>
+</div>
+{% endblock %}

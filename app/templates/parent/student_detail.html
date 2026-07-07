@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block page_title %}Student Record{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="panel-title-row">
+    <div><h2>{{ student.full_name }}</h2><p class="subtle">{{ student.student_code }} · {{ student.year_group }}</p></div>
+    <div class="actions">
+      <a class="btn btn-outline-primary" href="{{ url_for('parent.student_timetable', student_id=student.id) }}">Timetable</a>
+      <a class="btn btn-primary" href="{{ url_for('parent.report', student_id=student.id) }}">Download Report</a>
+    </div>
+  </div>
+  <div class="detail-grid">
+    <div><span>Birthday</span><strong>{{ student.date_of_birth }}</strong></div>
+    <div><span>Address</span><strong>{{ student.address or "Not recorded" }}</strong></div>
+    <div><span>Emergency Contact</span><strong>{{ student.emergency_contact_name }} {{ student.emergency_contact_phone }}</strong></div>
+    <div><span>Classes</span><strong>{{ student.classes|map(attribute="name")|join(", ") }}</strong></div>
+    <div><span>Attendance</span><strong>{{ student.attendance_percentage }}%</strong></div>
+    <div><span>Medical Notes</span><strong>{{ student.medical_notes or "None" }}</strong></div>
+  </div>
+</section>
+<section class="panel">
+  <h2>Recent Grades</h2>
+  <table class="table"><thead><tr><th>Assignment</th><th>Subject</th><th>Mark</th><th>Grade</th></tr></thead>
+    <tbody>{% for grade in student.grades %}<tr><td>{{ grade.assignment.title }}</td><td>{{ grade.assignment.school_class.subject }}</td><td>{{ grade.mark }}/{{ grade.assignment.max_mark }}</td><td>{{ grade.letter_grade }}</td></tr>{% endfor %}</tbody>
+  </table>
+</section>
+{% endblock %}

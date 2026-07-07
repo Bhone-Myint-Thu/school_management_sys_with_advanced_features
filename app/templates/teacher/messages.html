@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block page_title %}Messages{% endblock %}
+{% block content %}
+<div class="grid-2">
+  <section class="panel message-compose"><h2>Message Parent</h2><form method="post">{% include "partials/form.html" %}</form></section>
+  <section class="panel">{% include "partials/messages.html" %}</section>
+</div>
+{% endblock %}

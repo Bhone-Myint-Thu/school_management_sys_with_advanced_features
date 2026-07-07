@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block page_title %}Classes{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <form class="filter-grid" method="get">
+    <select class="form-select" name="year_group">
+      <option value="">All grades</option>
+      {% for grade in grade_choices %}<option value="{{ grade }}" {% if selected_year_group == grade %}selected{% endif %}>{{ grade }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-primary">Filter</button>
+  </form>
+  <a class="btn btn-primary" href="{{ url_for('admin.class_create') }}">Add Class</a>
+</div>
+<section class="panel">
+  <table class="table">
+    <thead><tr><th>Class</th><th>Grade</th><th>Teacher</th><th>Room</th><th>Students</th><th></th></tr></thead>
+    <tbody>{% for class in classes %}<tr><td><a class="table-link" href="{{ url_for('admin.class_detail', class_id=class.id) }}">{{ class.name }}</a></td><td>{{ class.year_group }} {{ class.section }}</td><td>{{ class.teacher.full_name }}</td><td>{{ class.room }}</td><td>{{ class.students|length }}</td><td class="actions"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.class_edit', class_id=class.id) }}">Edit</a></td></tr>{% endfor %}</tbody>
+  </table>
+</section>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block page_title %}Assignments{% endblock %}
+{% block content %}
+<div class="grid-2">
+  <section class="panel"><h2>Create Assignment</h2><form method="post">{% include "partials/form.html" %}</form></section>
+  <section class="panel">
+    <h2>Assignments</h2>
+    <table class="table"><thead><tr><th>Title</th><th>Class</th><th>Due</th><th>Weight</th></tr></thead>
+      <tbody>{% for row in assignments %}<tr><td>{{ row.title }}</td><td>{{ row.school_class.name }}</td><td>{{ row.due_date }}</td><td>{{ row.weight_pct }}%</td></tr>{% endfor %}</tbody>
+    </table>
+  </section>
+</div>
+{% endblock %}

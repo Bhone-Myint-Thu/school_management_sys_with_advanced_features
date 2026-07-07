@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block page_title %}Teacher Dashboard{% endblock %}
+{% block content %}
+{% if notices %}
+<section class="panel">
+  <h2>Notices</h2>
+  <div class="notice-list">{% for notice in notices %}<article><strong>{{ notice.title }}</strong><p>{{ notice.body }}</p></article>{% endfor %}</div>
+</section>
+{% endif %}
+<div class="stat-grid">
+  <div class="stat-card"><span>Classes</span><strong>{{ classes|length }}</strong></div>
+  <div class="stat-card"><span>Assignments</span><strong>{{ assignments|length }}</strong></div>
+  <div class="stat-card"><span>Students</span><strong>{{ students|length }}</strong></div>
+  <div class="stat-card"><span>Unread Messages</span><strong>{{ inbox|selectattr("is_read", "equalto", false)|list|length }}</strong></div>
+</div>
+<section class="panel">
+  <h2>My Classes</h2>
+  <table class="table">
+    <thead><tr><th>Class</th><th>Subject</th><th>Year</th><th>Room</th></tr></thead>
+    <tbody>{% for class in classes %}<tr><td>{{ class.name }}</td><td>{{ class.subject }}</td><td>{{ class.year_group }}</td><td>{{ class.room }}</td></tr>{% endfor %}</tbody>
+  </table>
+</section>
+<section class="panel">
+  <div class="panel-title-row">
+    <h2>Recent Leave Requests</h2>
+    <a class="btn btn-outline-primary" href="{{ url_for('teacher.leave') }}">View leave</a>
+  </div>
+  <table class="table">
+    <thead><tr><th>Student</th><th>Dates</th><th>Status</th></tr></thead>
+    <tbody>{% for row in leave_requests %}<tr><td>{{ row.student.full_name }}</td><td>{{ row.start_date }} to {{ row.end_date }}</td><td><span class="badge status-{{ row.status }}">{{ row.status|title }}</span></td></tr>{% endfor %}</tbody>
+  </table>
+</section>
+{% endblock %}

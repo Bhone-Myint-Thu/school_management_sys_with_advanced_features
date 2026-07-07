@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block page_title %}Management Dashboard{% endblock %}
+{% block content %}
+<div class="stat-grid">
+  <div class="stat-card"><span>Students</span><strong>{{ students|length }}</strong></div>
+  <div class="stat-card"><span>Teachers</span><strong>{{ teachers|length }}</strong></div>
+  <div class="stat-card"><span>Classes</span><strong>{{ classes|length }}</strong></div>
+  <div class="stat-card"><span>Leave Pending</span><strong>{{ leave_requests|selectattr("status", "equalto", "pending")|list|length }}</strong></div>
+</div>
+
+<section class="panel">
+  <div class="panel-title-row">
+    <h2>Attendance Filters</h2>
+    <a class="btn btn-outline-primary" href="{{ url_for('admin.dashboard') }}">Reset</a>
+  </div>
+  <form class="filter-grid" method="get">
+    <select class="form-select" name="month">
+      <option value="0">All months</option>
+      {% for month in range(1, 13) %}<option value="{{ month }}" {% if selected_month == month %}selected{% endif %}>Month {{ month }}</option>{% endfor %}
+    </select>
+    <select class="form-select" name="year">
+      <option value="0">All years</option>
+      {% for year in range(2024, 2031) %}<option value="{{ year }}" {% if selected_year == year %}selected{% endif %}>{{ year }}</option>{% endfor %}
+    </select>
+    <select class="form-select" name="year_group">
+      <option value="">All grades</option>
+      {% for grade in grade_choices %}<option value="{{ grade }}" {% if selected_year_group == grade %}selected{% endif %}>{{ grade }}</option>{% endfor %}
+    </select>
+    <select class="form-select" name="class_id">
+      <option value="0">All classes</option>
+      {% for class in classes %}<option value="{{ class.id }}" {% if selected_class_id == class.id %}selected{% endif %}>{{ class.name }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-primary">Apply</button>
+  </form>
+</section>
+
+<div class="grid-2">
+  <section class="panel">
+    <div class="panel-title-row">
+      <h2>Most Absent by Grade/Class</h2>
+      <a class="btn btn-outline-primary" href="{{ url_for('admin.leave') }}">Review leave</a>
+    </div>
+    <table class="table">
+      <thead><tr><th>Grade</th><th>Class</th><th>Absences</th></tr></thead>
+      <tbody>
+      {% for row in absence_rows %}
+        <tr><td>{{ row.year_group }}</td><td>{{ row.name }}</td><td><span class="badge status-absent">{{ row.absences }}</span></td></tr>
+      {% else %}
+        <tr><td colspan="3">No absences match the selected filters.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  <section class="panel">
+    <div class="panel-title-row">
+      <h2>Students by Grade/Class</h2>
+      <a class="btn btn-outline-primary" href="{{ url_for('admin.classes') }}">Class list</a>
+    </div>
+    <table class="table">
+      <thead><tr><th>Grade</th><th>Class</th><th>Students</th></tr></thead>
+      <tbody>
+      {% for row in class_summary %}
+        <tr><td>{{ row.year_group }}</td><td>{{ row.name }}</td><td>{{ row.student_count }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<section class="panel">
+  <div class="panel-title-row">
+    <h2>Recent Leave Requests</h2>
+    <a class="btn btn-outline-primary" href="{{ url_for('admin.leave') }}">Review all</a>
+  </div>
+  <table class="table">
+    <thead><tr><th>Student</th><th>Dates</th><th>Reason</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for row in leave_requests %}
+      <tr>
+        <td><a class="table-link" href="{{ url_for('admin.leave_detail', leave_id=row.id) }}">{{ row.student.full_name }}</a></td>
+        <td>{{ row.start_date }} to {{ row.end_date }}</td>
+        <td>{{ row.reason }}</td>
+        <td><span class="badge status-{{ row.status }}">{{ row.status|title }}</span></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="4">No leave requests yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

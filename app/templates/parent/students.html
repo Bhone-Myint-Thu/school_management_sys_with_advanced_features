@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block page_title %}Students{% endblock %}
+{% block content %}
+{% for child in children %}
+<section class="panel">
+  <div class="panel-title-row">
+    <div>
+      <h2>{{ child.full_name }}</h2>
+      <p class="subtle">{{ child.student_code }} · {{ child.year_group }}</p>
+    </div>
+    <div class="actions">
+      <a class="btn btn-outline-primary" href="{{ url_for('parent.student_timetable', student_id=child.id) }}">Timetable</a>
+      <a class="btn btn-outline-primary" href="{{ url_for('parent.student_detail', student_id=child.id) }}">Details</a>
+      <a class="btn btn-primary" href="{{ url_for('parent.report', student_id=child.id) }}">Download Report</a>
+    </div>
+  </div>
+  <div class="stat-grid">
+    <div class="stat-card"><span>Attendance</span><strong>{{ child.attendance_percentage }}%</strong></div>
+    <div class="stat-card"><span>Grades</span><strong>{{ child.grades|length }}</strong></div>
+    <div class="stat-card"><span>Leave Requests</span><strong>{{ child.leave_requests|length }}</strong></div>
+  </div>
+</section>
+{% endfor %}
+{% endblock %}

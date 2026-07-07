@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block page_title %}Grades{% endblock %}
+{% block content %}
+<div class="grid-2">
+  <section class="panel"><h2>Enter Grade</h2><form method="post">{% include "partials/form.html" %}</form></section>
+  <section class="panel">
+    <h2>Recent Grades</h2>
+    <table class="table"><thead><tr><th>Student</th><th>Assignment</th><th>Mark</th><th>Grade</th></tr></thead>
+      <tbody>{% for row in grades %}<tr><td>{{ row.student.full_name }}</td><td>{{ row.assignment.title }}</td><td>{{ row.mark }}/{{ row.assignment.max_mark }}</td><td>{{ row.letter_grade }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </section>
+</div>
+{% endblock %}

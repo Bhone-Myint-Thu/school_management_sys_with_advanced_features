@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block page_title %}Leave Request Detail{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="panel-title-row">
+    <div><h2>{{ leave_request.student.full_name }}</h2><p class="subtle">{{ leave_request.start_date }} to {{ leave_request.end_date }}</p></div>
+    <span class="badge status-{{ leave_request.status }}">{{ leave_request.status|title }}</span>
+  </div>
+  <div class="detail-grid">
+    <div><span>Requested By</span><strong>{{ leave_request.requested_by.display_name }}</strong></div>
+    <div><span>Class</span><strong>{{ leave_request.student.classes|map(attribute="name")|join(", ") }}</strong></div>
+    <div><span>Reason</span><strong>{{ leave_request.reason }}</strong></div>
+    <div><span>Response</span><strong>{{ leave_request.response_note or "No response yet" }}</strong></div>
+  </div>
+</section>
+<section class="panel narrow">
+  <div class="panel-title-row">
+    <h2>Teacher Decision</h2>
+    <div class="actions">
+      <form method="post" action="{{ url_for('teacher.leave_set_status', leave_id=leave_request.id, status='draft') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-outline-primary">Reset to Draft</button></form>
+      <form method="post" action="{{ url_for('teacher.leave_set_status', leave_id=leave_request.id, status='approved') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-primary">Approve</button></form>
+      <form method="post" action="{{ url_for('teacher.leave_set_status', leave_id=leave_request.id, status='refused') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-outline-danger">Refuse</button></form>
+    </div>
+  </div>
+  <form method="post">{% include "partials/form.html" %}</form>
+</section>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block page_title %}Create Assignment{% endblock %}
+{% block content %}
+<section class="panel narrow">
+  <div class="panel-title-row">
+    <h2>Create Assignment</h2>
+    <a class="btn btn-outline-primary" href="{{ url_for('teacher.assignment_records') }}">Assignment Records</a>
+  </div>
+  <form method="post">{% include "partials/form.html" %}</form>
+</section>
+{% endblock %}

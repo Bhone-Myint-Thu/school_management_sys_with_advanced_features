@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block page_title %}Leave Requests{% endblock %}
+{% block content %}
+<section class="panel">
+  <table class="table">
+    <thead><tr><th>Student</th><th>Dates</th><th>Reason</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody>
+    {% for row in leave_requests %}
+      <tr>
+        <td><a class="table-link" href="{{ url_for('teacher.leave_detail', leave_id=row.id) }}">{{ row.student.full_name }}</a><small>{{ row.student.year_group }}</small></td>
+        <td>{{ row.start_date }} to {{ row.end_date }}</td>
+        <td>{{ row.reason }}</td>
+        <td><span class="badge status-{{ row.status }}">{{ row.status|title }}</span></td>
+        <td class="actions">
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('teacher.leave_detail', leave_id=row.id) }}">Detail</a>
+          <form method="post" action="{{ url_for('teacher.leave_set_status', leave_id=row.id, status='approved') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-primary">Approve</button></form>
+          <form method="post" action="{{ url_for('teacher.leave_set_status', leave_id=row.id, status='refused') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger">Refuse</button></form>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5">No leave requests yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

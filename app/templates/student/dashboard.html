@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block page_title %}Student Dashboard{% endblock %}
+{% block content %}
+{% if notices %}
+<section class="panel">
+  <h2>Notices</h2>
+  <div class="notice-list">{% for notice in notices %}<article><strong>{{ notice.title }}</strong><p>{{ notice.body }}</p></article>{% endfor %}</div>
+</section>
+{% endif %}
+<div class="stat-grid">
+  <div class="stat-card"><span>Attendance</span><strong>{{ student.attendance_percentage }}%</strong></div>
+  <div class="stat-card"><span>Grades</span><strong>{{ student.grades|length }}</strong></div>
+  <div class="stat-card"><span>Assignments</span><strong>{{ assignments|length }}</strong></div>
+</div>
+<div class="grid-2">
+  <section class="panel">
+    <h2>Timetable</h2>
+    <table class="table"><thead><tr><th>Day</th><th>Period</th><th>Class</th><th>Time</th></tr></thead>
+      <tbody>{% for slot in timetable %}<tr><td>{{ slot.day_of_week }}</td><td>{{ slot.period }}</td><td>{{ slot.school_class.subject }}</td><td>{{ slot.start_time.strftime("%H:%M") }}-{{ slot.end_time.strftime("%H:%M") }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </section>
+  <section class="panel">
+    <h2>Grade Trend</h2>
+    <canvas class="chart" data-labels='[{% for grade in student.grades %}"{{ grade.assignment.title }}"{% if not loop.last %},{% endif %}{% endfor %}]' data-values='[{% for grade in student.grades %}{{ grade.mark }}{% if not loop.last %},{% endif %}{% endfor %}]'></canvas>
+  </section>
+</div>
+<section class="panel">
+  <h2>Upcoming Assignments</h2>
+  <table class="table"><thead><tr><th>Title</th><th>Subject</th><th>Due date</th></tr></thead>
+    <tbody>{% for row in assignments %}<tr><td>{{ row.title }}</td><td>{{ row.school_class.subject }}</td><td>{{ row.due_date }}</td></tr>{% endfor %}</tbody>
+  </table>
+</section>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block page_title %}Timetable Detail{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="panel-title-row">
+    <div><h2>{{ school_class.name }}</h2><p class="subtle">Monday to Friday class times</p></div>
+    <a class="btn btn-primary" href="{{ url_for('admin.timetable_create') }}">Add Slot</a>
+  </div>
+  <table class="table">
+    <thead><tr><th>Day</th><th>Period</th><th>Time</th><th>Subject</th><th>Room</th></tr></thead>
+    <tbody>
+    {% for day in days %}
+      {% set slots = school_class.timetable|selectattr("day_of_week", "equalto", day)|list %}
+      {% if slots %}
+        {% for slot in slots %}<tr><td>{{ day }}</td><td>{{ slot.period }}</td><td>{{ slot.start_time.strftime("%H:%M") }} - {{ slot.end_time.strftime("%H:%M") }}</td><td>{{ school_class.subject }}</td><td>{{ school_class.room }}</td></tr>{% endfor %}
+      {% else %}
+        <tr><td>{{ day }}</td><td colspan="4">No class scheduled</td></tr>
+      {% endif %}
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

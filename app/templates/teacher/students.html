@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block page_title %}Students List{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <form class="filter-grid" method="get">
+    <select class="form-select" name="year_group">
+      <option value="">All grades</option>
+      {% for grade in grade_choices %}<option value="{{ grade }}" {% if selected_year_group == grade %}selected{% endif %}>{{ grade }}</option>{% endfor %}
+    </select>
+    <select class="form-select" name="class_id">
+      <option value="0">All my classes</option>
+      {% for class in classes %}<option value="{{ class.id }}" {% if selected_class_id == class.id %}selected{% endif %}>{{ class.name }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-primary">Filter</button>
+  </form>
+</div>
+<section class="panel">
+  <table class="table">
+    <thead><tr><th>Name</th><th>Code</th><th>Year</th><th>Attendance</th><th>Recent Grades</th></tr></thead>
+    <tbody>
+    {% for student in students %}
+      <tr>
+        <td><a class="table-link" href="{{ url_for('teacher.student_detail', student_id=student.id) }}">{{ student.full_name }}</a><small>{{ student.user.email }}</small></td>
+        <td>{{ student.student_code }}</td>
+        <td>{{ student.year_group }}</td>
+        <td>{{ student.attendance_percentage }}%</td>
+        <td>{{ student.grades|length }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

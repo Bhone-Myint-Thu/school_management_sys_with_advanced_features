@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block page_title %}Attendance Records{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <form class="filter-grid" method="get">
+    <select class="form-select" name="year_group">
+      <option value="">All grades</option>
+      {% for grade in grade_choices %}<option value="{{ grade }}" {% if selected_year_group == grade %}selected{% endif %}>{{ grade }}</option>{% endfor %}
+    </select>
+    <select class="form-select" name="class_id">
+      <option value="0">All my classes</option>
+      {% for class in classes %}<option value="{{ class.id }}" {% if selected_class_id == class.id %}selected{% endif %}>{{ class.name }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-primary">Filter</button>
+  </form>
+  <a class="btn btn-primary" href="{{ url_for('teacher.attendance_create') }}">Mark Attendance</a>
+</div>
+<section class="panel">
+  <table class="table">
+    <thead><tr><th>Date</th><th>Student</th><th>Grade</th><th>Class</th><th>Status</th><th>Note</th></tr></thead>
+    <tbody>{% for row in records %}<tr><td>{{ row.session_date }}</td><td><a class="table-link" href="{{ url_for('teacher.student_detail', student_id=row.student.id) }}">{{ row.student.full_name }}</a></td><td>{{ row.student.year_group }}</td><td>{{ row.school_class.name }}</td><td><span class="badge status-{{ row.status }}">{{ row.status|title }}</span></td><td>{{ row.note or "" }}</td></tr>{% endfor %}</tbody>
+  </table>
+</section>
+{% endblock %}

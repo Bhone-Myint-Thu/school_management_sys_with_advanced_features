@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block page_title %}Timetable List{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <form class="filter-grid" method="get">
+    <select class="form-select" name="year_group">
+      <option value="">All grades</option>
+      {% for grade in grade_choices %}<option value="{{ grade }}" {% if selected_year_group == grade %}selected{% endif %}>{{ grade }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-primary">Filter</button>
+  </form>
+  <a class="btn btn-primary" href="{{ url_for('admin.timetable_create') }}">Add Timetable Slot</a>
+</div>
+<section class="panel">
+  <table class="table"><thead><tr><th>Class</th><th>Grade</th><th>Teacher</th><th>Slots</th></tr></thead>
+    <tbody>{% for class in classes %}<tr><td><a class="table-link" href="{{ url_for('admin.timetable_detail', class_id=class.id) }}">{{ class.name }}</a></td><td>{{ class.year_group }}</td><td>{{ class.teacher.full_name }}</td><td>{{ class.timetable|length }}</td></tr>{% endfor %}</tbody>
+  </table>
+</section>
+{% endblock %}

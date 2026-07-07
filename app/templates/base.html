@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}School Management System{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v='4') }}">
+</head>
+<body>
+  {% if current_user.is_authenticated %}
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark">SMS</span>
+        <div>
+          <strong>School Portal</strong>
+          <small>{{ current_user.role|title }}</small>
+        </div>
+      </div>
+      <nav class="side-nav">
+        <a class="nav-link {% if request.endpoint.endswith('.dashboard') %}active{% endif %}" href="{{ url_for('main.index') }}"><span>▦</span>Dashboard</a>
+        {% if current_user.role in ['admin', 'headmaster', 'dean'] %}
+          <a class="nav-link {% if request.endpoint.startswith('admin.student') or request.endpoint == 'admin.students' %}active{% endif %}" href="{{ url_for('admin.students') }}"><span>◉</span>Students</a>
+          <a class="nav-link {% if request.endpoint.startswith('admin.teacher') or request.endpoint == 'admin.teachers' %}active{% endif %}" href="{{ url_for('admin.teachers') }}"><span>▣</span>Teachers</a>
+          <a class="nav-link {% if request.endpoint.startswith('admin.parent') or request.endpoint == 'admin.parents' %}active{% endif %}" href="{{ url_for('admin.parents') }}"><span>◇</span>Parents</a>
+          <a class="nav-link {% if request.endpoint.startswith('admin.class') or request.endpoint == 'admin.classes' %}active{% endif %}" href="{{ url_for('admin.classes') }}"><span>⌂</span>Classes</a>
+          <a class="nav-link {% if request.endpoint.startswith('admin.timetable') %}active{% endif %}" href="{{ url_for('admin.timetable') }}"><span>◴</span>Timetable</a>
+          <a class="nav-link {% if request.endpoint.startswith('admin.leave') %}active{% endif %}" href="{{ url_for('admin.leave') }}"><span>✓</span>Leave</a>
+          <a class="nav-link {% if request.endpoint.startswith('admin.notice') %}active{% endif %}" href="{{ url_for('admin.notices') }}"><span>!</span>Notices</a>
+        {% elif current_user.role == 'teacher' %}
+          <a class="nav-link {% if request.endpoint == 'teacher.students' %}active{% endif %}" href="{{ url_for('teacher.students') }}"><span>◉</span>Students</a>
+          <div class="nav-group {% if request.endpoint.startswith('teacher.attendance') %}open{% endif %}">
+            <div class="nav-group-title"><span>✓</span>Attendance</div>
+            <a class="nav-sub-link {% if request.endpoint == 'teacher.attendance_create' %}active{% endif %}" href="{{ url_for('teacher.attendance_create') }}">Mark Attendance</a>
+            <a class="nav-sub-link {% if request.endpoint == 'teacher.attendance_records' %}active{% endif %}" href="{{ url_for('teacher.attendance_records') }}">Check Records</a>
+          </div>
+          <div class="nav-group {% if request.endpoint.startswith('teacher.assignment') or request.endpoint.startswith('teacher.assignments') %}open{% endif %}">
+            <div class="nav-group-title"><span>□</span>Assignment</div>
+            <a class="nav-sub-link {% if request.endpoint == 'teacher.assignment_create' %}active{% endif %}" href="{{ url_for('teacher.assignment_create') }}">Create Assignment</a>
+            <a class="nav-sub-link {% if request.endpoint == 'teacher.assignment_records' %}active{% endif %}" href="{{ url_for('teacher.assignment_records') }}">Records</a>
+          </div>
+          <div class="nav-group {% if request.endpoint.startswith('teacher.grade') or request.endpoint.startswith('teacher.grades') %}open{% endif %}">
+            <div class="nav-group-title"><span>★</span>Grade</div>
+            <a class="nav-sub-link {% if request.endpoint == 'teacher.grade_create' %}active{% endif %}" href="{{ url_for('teacher.grade_create') }}">Enter Grade</a>
+            <a class="nav-sub-link {% if request.endpoint == 'teacher.grade_records' %}active{% endif %}" href="{{ url_for('teacher.grade_records') }}">Records</a>
+          </div>
+          <a class="nav-link {% if request.endpoint == 'teacher.leave' %}active{% endif %}" href="{{ url_for('teacher.leave') }}"><span>◷</span>Leave</a>
+          <div class="nav-group {% if request.endpoint.startswith('teacher.message') or request.endpoint.startswith('teacher.messages') %}open{% endif %}">
+            <div class="nav-group-title"><span>✉</span>Messages</div>
+            <a class="nav-sub-link {% if request.endpoint == 'teacher.message_send' %}active{% endif %}" href="{{ url_for('teacher.message_send') }}">Send Message</a>
+            <a class="nav-sub-link {% if request.endpoint == 'teacher.message_inbox' %}active{% endif %}" href="{{ url_for('teacher.message_inbox') }}">Inbox</a>
+            <a class="nav-sub-link {% if request.endpoint == 'teacher.message_sent' %}active{% endif %}" href="{{ url_for('teacher.message_sent') }}">Sent</a>
+          </div>
+        {% elif current_user.role == 'parent' %}
+          <a class="nav-link {% if request.endpoint == 'parent.students' %}active{% endif %}" href="{{ url_for('parent.students') }}"><span>◉</span>Students</a>
+          <a class="nav-link {% if request.endpoint == 'parent.leave' %}active{% endif %}" href="{{ url_for('parent.leave') }}"><span>◷</span>Leave</a>
+          <a class="nav-link {% if request.endpoint.startswith('parent.messages') %}active{% endif %}" href="{{ url_for('parent.messages') }}"><span>✉</span>Messages</a>
+        {% elif current_user.role == 'student' %}
+          <a class="nav-link" href="{{ url_for('student.dashboard') }}"><span>◴</span>Timetable</a>
+        {% endif %}
+      </nav>
+      <form action="{{ url_for('auth.logout') }}" method="post" class="logout-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-ghost btn-block" type="submit">Sign out</button>
+      </form>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1>{% block page_title %}Dashboard{% endblock %}</h1>
+          <span>{{ current_user.display_name }}</span>
+        </div>
+      </header>
+      <section class="content">
+        {% include "partials/flash.html" %}
+        {% block content %}{% endblock %}
+      </section>
+    </main>
+  </div>
+  {% else %}
+    <main class="auth-page">
+      {% include "partials/flash.html" %}
+      {% block auth_content %}{% endblock %}
+    </main>
+  {% endif %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

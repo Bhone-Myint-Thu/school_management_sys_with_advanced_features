@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block auth_content %}
+<section class="login-panel">
+  <div class="login-copy">
+    <p class="eyebrow">Web-Based School Management System</p>
+    <h1>Sign in to the school portal</h1>
+    <p>Manage students, attendance, grades, leave requests, messaging, and academic reports from one secure portal.</p>
+  </div>
+  <form method="post" class="login-card">
+    <h2>Welcome back</h2>
+    <p class="form-hint">Use a demo account to explore each role.</p>
+    {% include "partials/form.html" %}
+    <div class="demo-logins">
+      <strong>Demo logins</strong>
+      <span>admin@sms.example.com</span>
+      <span>teacher@sms.example.com</span>
+      <span>parent@sms.example.com</span>
+      <span>student@sms.example.com</span>
+      <small>Password: Password123</small>
+    </div>
+  </form>
+</section>
+{% endblock %}

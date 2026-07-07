@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block page_title %}Leave Module{% endblock %}
+{% block content %}
+<div class="grid-2">
+  <section class="panel">
+    <h2>Submit Leave Request</h2>
+    <form method="post">{% include "partials/form.html" %}</form>
+  </section>
+  <section class="panel">
+    <h2>Leave History</h2>
+    <table class="table">
+      <thead><tr><th>Student</th><th>Dates</th><th>Status</th><th>Response</th></tr></thead>
+      <tbody>
+      {% for row in leave_requests %}
+        <tr>
+          <td>{{ row.student.full_name }}</td>
+          <td>{{ row.start_date }} to {{ row.end_date }}</td>
+          <td><span class="badge status-{{ row.status }}">{{ row.status|title }}</span></td>
+          <td>{{ row.response_note or "Pending review" }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="4">No leave requests yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+{% endblock %}
