@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block page_title %}Leave Requests{% endblock %}
 {% block content %}
+{% if not settings.teacher_leave_decisions_enabled %}
+  <div class="alert alert-warning">Teacher leave decisions are disabled in system settings. You can still review assigned-student leave records.</div>
+{% endif %}
 <section class="panel">
   <table class="table">
     <thead><tr><th>Student</th><th>Dates</th><th>Reason</th><th>Status</th><th>Actions</th></tr></thead>
@@ -13,8 +16,10 @@
         <td><span class="badge status-{{ row.status }}">{{ row.status|title }}</span></td>
         <td class="actions">
           <a class="btn btn-sm btn-outline-primary" href="{{ url_for('teacher.leave_detail', leave_id=row.id) }}">Detail</a>
-          <form method="post" action="{{ url_for('teacher.leave_set_status', leave_id=row.id, status='approved') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-primary">Approve</button></form>
-          <form method="post" action="{{ url_for('teacher.leave_set_status', leave_id=row.id, status='refused') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger">Refuse</button></form>
+          {% if settings.teacher_leave_decisions_enabled %}
+            <form method="post" action="{{ url_for('teacher.leave_set_status', leave_id=row.id, status='approved') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-primary">Approve</button></form>
+            <form method="post" action="{{ url_for('teacher.leave_set_status', leave_id=row.id, status='refused') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger">Refuse</button></form>
+          {% endif %}
         </td>
       </tr>
     {% else %}

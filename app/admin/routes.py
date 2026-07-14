@@ -2,12 +2,24 @@ from datetime import datetime
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from ..access import MANAGEMENT_ROLES, visible_classes_query
 from ..extensions import db
-from ..forms import ClassForm, LeaveDecisionForm, NoticeForm, ParentForm, StudentForm, TeacherForm, TimetableForm
-from ..models import Attendance, LeaveRequest, Notice, Parent, SchoolClass, Student, Teacher, Timetable, User
+from ..forms import (
+    ClassForm,
+    LeaveDecisionForm,
+    NoticeForm,
+    ParentForm,
+    ProfileUserLinkForm,
+    StudentForm,
+    SystemSettingsForm,
+    TeacherForm,
+    TimetableForm,
+    UserAccountForm,
+    UserPasswordForm,
+)
+from ..models import Attendance, LeaveRequest, Notice, Parent, SchoolClass, Student, SystemSetting, Teacher, Timetable, User
 from ..security import roles_required
 
 bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -50,6 +62,45 @@ def _apply_student_filters(query):
     return query, search, year_group, class_id
 
 
+def _apply_teacher_filters(query):
+    search = request.args.get("q", "").strip()
+    department = request.args.get("department", "").strip()
+    position = request.args.get("position", "").strip()
+    if search:
+        pattern = f"%{search}%"
+        query = query.join(User).filter(
+            or_(Teacher.full_name.ilike(pattern), Teacher.staff_code.ilike(pattern), Teacher.department.ilike(pattern), User.email.ilike(pattern))
+        )
+    if department:
+        query = query.filter(Teacher.department == department)
+    if position:
+        query = query.filter(Teacher.position == position)
+    return query, search, department, position
+
+
+def _apply_parent_filters(query):
+    search = request.args.get("q", "").strip()
+    relationship = request.args.get("relationship", "").strip()
+    year_group = request.args.get("year_group", "").strip()
+    if search:
+        pattern = f"%{search}%"
+        query = query.join(User).filter(
+            or_(
+                Parent.full_name.ilike(pattern),
+                Parent.phone.ilike(pattern),
+                Parent.relationship.ilike(pattern),
+                User.email.ilike(pattern),
+                Parent.students.any(Student.full_name.ilike(pattern)),
+                Parent.students.any(Student.student_code.ilike(pattern)),
+            )
+        )
+    if relationship:
+        query = query.filter(Parent.relationship == relationship)
+    if year_group:
+        query = query.filter(Parent.students.any(Student.year_group == year_group))
+    return query, search, relationship, year_group
+
+
 def _apply_class_filters(query):
     year_group = request.args.get("year_group", "").strip()
     if year_group:
@@ -59,6 +110,50 @@ def _apply_class_filters(query):
 
 def _grade_choices():
     return [f"Grade {i}" for i in range(1, 13)]
+
+
+def _user_choices():
+    return [(user.id, f"{user.email} ({user.role})") for user in User.query.order_by(User.email)]
+
+
+def _profile_choices():
+    choices = []
+    choices.extend((f"student:{row.id}", f"Student - {row.full_name} ({row.user.email})") for row in Student.query.order_by(Student.full_name))
+    choices.extend((f"parent:{row.id}", f"Parent - {row.full_name} ({row.user.email})") for row in Parent.query.order_by(Parent.full_name))
+    choices.extend((f"teacher:{row.id}", f"Teacher - {row.full_name} ({row.user.email})") for row in Teacher.query.order_by(Teacher.full_name))
+    return choices
+
+
+def _prepare_account_forms(account_form=None, password_form=None, link_form=None):
+    account_form = account_form or UserAccountForm(prefix="account")
+    password_form = password_form or UserPasswordForm(prefix="password")
+    link_form = link_form or ProfileUserLinkForm(prefix="link")
+    password_form.user_id.choices = _user_choices()
+    link_form.user_id.choices = _user_choices()
+    link_form.profile_ref.choices = _profile_choices()
+    return account_form, password_form, link_form
+
+
+def _profile_from_ref(profile_ref):
+    profile_type, raw_id = profile_ref.split(":", 1)
+    model_map = {"student": Student, "parent": Parent, "teacher": Teacher}
+    if profile_type not in model_map:
+        return None, None
+    return profile_type, db.session.get(model_map[profile_type], int(raw_id))
+
+
+def _user_can_link_profile(user, profile_type, profile):
+    if profile_type == "student" and user.role != "student":
+        return False, "Student profiles must be linked to student user accounts."
+    if profile_type == "parent" and user.role != "parent":
+        return False, "Parent profiles must be linked to parent user accounts."
+    if profile_type == "teacher" and user.role not in {"teacher", "dean", "headmaster"}:
+        return False, "Teacher profiles must be linked to teacher, dean, or headmaster user accounts."
+    linked_profiles = [user.student, user.parent, user.teacher]
+    for linked in linked_profiles:
+        if linked is not None and (linked.__class__ is not profile.__class__ or linked.id != profile.id):
+            return False, "That user account is already connected to another profile."
+    return True, ""
 
 
 @bp.route("/")
@@ -85,6 +180,7 @@ def dashboard():
         .order_by(func.count(Attendance.id).desc())
         .all()
     )
+
     class_summary = (
         db.session.query(SchoolClass.year_group, SchoolClass.name, func.count(Student.id).label("student_count"))
         .outerjoin(SchoolClass.students)
@@ -107,6 +203,96 @@ def dashboard():
         selected_class_id=class_id,
         selected_year_group=year_group,
     )
+
+
+@bp.route("/settings", methods=["GET", "POST"])
+@login_required
+@roles_required("admin", "headmaster", "dean")
+def settings():
+    settings = SystemSetting.current()
+    active_tab = request.args.get("tab", "system")
+    form = SystemSettingsForm(obj=settings)
+    account_form, password_form, link_form = _prepare_account_forms()
+    if form.validate_on_submit():
+        if form.default_grade_start.data > form.default_grade_end.data:
+            form.default_grade_end.errors.append("Ending grade must be greater than or equal to starting grade.")
+        else:
+            form.populate_obj(settings)
+            db.session.commit()
+            flash("System settings updated.", "success")
+            return redirect(url_for("admin.settings", tab="system"))
+    return render_template(
+        "admin/settings.html",
+        form=form,
+        settings=settings,
+        active_tab=active_tab,
+        account_form=account_form,
+        password_form=password_form,
+        link_form=link_form,
+        users=User.query.order_by(User.email).all(),
+    )
+
+
+@bp.route("/settings/users/create", methods=["POST"])
+@login_required
+@roles_required("admin", "headmaster", "dean")
+def setting_user_create():
+    form, _, _ = _prepare_account_forms(account_form=UserAccountForm(prefix="account"))
+    if form.validate_on_submit():
+        email = form.email.data.lower().strip()
+        if User.query.filter_by(email=email).first():
+            flash("A user with that email already exists.", "danger")
+        else:
+            user = _save_user(User(), email, form.role.data, form.password.data)
+            db.session.add(user)
+            db.session.commit()
+            flash("User account created. Link it to a profile before role-specific access is used.", "success")
+    else:
+        flash("Please check the user account form.", "danger")
+    return redirect(url_for("admin.settings", tab="create-user"))
+
+
+@bp.route("/settings/users/password", methods=["POST"])
+@login_required
+@roles_required("admin", "headmaster", "dean")
+def setting_user_password():
+    _, form, _ = _prepare_account_forms(password_form=UserPasswordForm(prefix="password"))
+    if form.validate_on_submit():
+        user = db.session.get(User, form.user_id.data)
+        if user:
+            user.set_password(form.password.data)
+            db.session.commit()
+            flash("User password changed.", "success")
+        else:
+            flash("User account not found.", "danger")
+    else:
+        flash("Please check the password form.", "danger")
+    return redirect(url_for("admin.settings", tab="change-password"))
+
+
+@bp.route("/settings/users/link", methods=["POST"])
+@login_required
+@roles_required("admin", "headmaster", "dean")
+def setting_user_link():
+    _, _, form = _prepare_account_forms(link_form=ProfileUserLinkForm(prefix="link"))
+    if form.validate_on_submit():
+        profile_type, profile = _profile_from_ref(form.profile_ref.data)
+        user = db.session.get(User, form.user_id.data)
+        if not profile or not user:
+            flash("Profile or user account not found.", "danger")
+        else:
+            allowed, message = _user_can_link_profile(user, profile_type, profile)
+            if not allowed:
+                flash(message, "danger")
+            else:
+                profile.user = user
+                if profile_type == "teacher":
+                    profile.position = user.role
+                db.session.commit()
+                flash("User account connected to profile.", "success")
+    else:
+        flash("Please check the profile connection form.", "danger")
+    return redirect(url_for("admin.settings", tab="connect-account"))
 
 
 @bp.route("/students")
@@ -137,16 +323,32 @@ def student_detail(student_id):
 @login_required
 @roles_required("admin", "headmaster", "dean")
 def teachers():
-    rows = Teacher.query.order_by(Teacher.full_name).all()
-    return render_template("admin/teachers.html", teachers=rows, positions=["teacher", "dean", "headmaster"])
+    rows, search, department, position = _apply_teacher_filters(Teacher.query)
+    return render_template(
+        "admin/teachers.html",
+        teachers=rows.order_by(Teacher.full_name).all(),
+        departments=[row[0] for row in db.session.query(Teacher.department).distinct().order_by(Teacher.department).all()],
+        positions=["teacher", "dean", "headmaster"],
+        search=search,
+        selected_department=department,
+        selected_position=position,
+    )
 
 
 @bp.route("/parents")
 @login_required
 @roles_required("admin", "headmaster", "dean")
 def parents():
-    rows = Parent.query.order_by(Parent.full_name).all()
-    return render_template("admin/parents.html", parents=rows)
+    rows, search, relationship, year_group = _apply_parent_filters(Parent.query)
+    return render_template(
+        "admin/parents.html",
+        parents=rows.order_by(Parent.full_name).all(),
+        relationships=[row[0] for row in db.session.query(Parent.relationship).distinct().order_by(Parent.relationship).all() if row[0]],
+        grade_choices=_grade_choices(),
+        search=search,
+        selected_relationship=relationship,
+        selected_year_group=year_group,
+    )
 
 
 @bp.route("/parents/<int:parent_id>")
@@ -226,9 +428,12 @@ def leave_decision(leave_id):
 @login_required
 @roles_required("admin", "headmaster", "dean")
 def notices():
+    settings = SystemSetting.current()
     form = NoticeForm()
+    if request.method == "GET":
+        form.audience.data = settings.default_notice_audience
     if form.validate_on_submit():
-        status = "approved" if current_user.role == "headmaster" else "pending"
+        status = "approved" if current_user.role == "headmaster" or not settings.notice_approval_required else "pending"
         notice = Notice(
             title=form.title.data,
             body=form.body.data,
@@ -243,7 +448,7 @@ def notices():
         flash("Notice announced." if status == "approved" else "Notice request sent to Headmaster.", "success")
         return redirect(url_for("admin.notices"))
     rows = Notice.query.order_by(Notice.created_at.desc()).all()
-    return render_template("admin/notices.html", form=form, notices=rows)
+    return render_template("admin/notices.html", form=form, notices=rows, settings=settings)
 
 
 @bp.route("/notices/<int:notice_id>/approve", methods=["POST"])

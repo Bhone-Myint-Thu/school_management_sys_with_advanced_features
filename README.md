@@ -27,7 +27,7 @@ pip install -r requirements.txt
 flask init-db
 flask run
 ```
-
+.venv/bin/flask --app run.py run
 Open `http://127.0.0.1:5000`.
 
 Demo accounts all use `Password123`:

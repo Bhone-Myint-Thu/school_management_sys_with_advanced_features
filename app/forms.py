@@ -1,12 +1,25 @@
 from flask_wtf import FlaskForm
-from wtforms import DateField, FloatField, PasswordField, SelectField, SelectMultipleField, StringField, SubmitField, TextAreaField, TimeField
-from wtforms.validators import DataRequired, Email, Length, NumberRange, Optional
+from wtforms import BooleanField, DateField, FloatField, IntegerField, PasswordField, SelectField, SelectMultipleField, StringField, SubmitField, TextAreaField, TimeField
+from wtforms.validators import DataRequired, Email, EqualTo, Length, NumberRange, Optional
 
 
 class LoginForm(FlaskForm):
     email = StringField("Email", validators=[DataRequired(), Email()])
     password = PasswordField("Password", validators=[DataRequired()])
     submit = SubmitField("Sign in")
+
+
+class SignupForm(FlaskForm):
+    role = SelectField("Account type", choices=[("parent", "Parent"), ("student", "Student")], validators=[DataRequired()])
+    full_name = StringField("Full name", validators=[DataRequired(), Length(max=120)])
+    email = StringField("Email", validators=[DataRequired(), Email()])
+    password = PasswordField("Password", validators=[DataRequired(), Length(min=8)])
+    confirm_password = PasswordField("Confirm password", validators=[DataRequired(), EqualTo("password")])
+    phone = StringField("Phone", validators=[Optional(), Length(max=40)])
+    year_group = StringField("Year group", validators=[Optional(), Length(max=20)])
+    date_of_birth = DateField("Date of birth", validators=[Optional()])
+    student_code = StringField("Student code", validators=[Optional(), Length(max=30)])
+    submit = SubmitField("Create account")
 
 
 class StudentForm(FlaskForm):
@@ -134,6 +147,63 @@ class NoticeForm(FlaskForm):
         validators=[DataRequired()],
     )
     submit = SubmitField("Submit notice")
+
+
+class SystemSettingsForm(FlaskForm):
+    school_name = StringField("School name", validators=[DataRequired(), Length(max=120)])
+    academic_session = StringField("Academic session", validators=[DataRequired(), Length(max=30)])
+    timezone = StringField("Timezone", validators=[DataRequired(), Length(max=60)])
+    attendance_alert_threshold = FloatField(
+        "Attendance alert threshold %",
+        validators=[DataRequired(), NumberRange(min=0, max=100)],
+    )
+    default_grade_start = IntegerField("Starting grade", validators=[DataRequired(), NumberRange(min=1, max=12)])
+    default_grade_end = IntegerField("Ending grade", validators=[DataRequired(), NumberRange(min=1, max=12)])
+    attendance_mode = SelectField(
+        "Attendance mode",
+        choices=[("daily_class", "Daily class-based tracking"), ("homeroom", "Homeroom only"), ("period", "Every period")],
+        validators=[DataRequired()],
+    )
+    default_notice_audience = SelectField(
+        "Default notice audience",
+        choices=[("teachers", "Teachers only"), ("parents", "Parents and teachers"), ("all", "All users")],
+        validators=[DataRequired()],
+    )
+    notice_approval_required = BooleanField("Dean notices require Headmaster approval")
+    teacher_leave_decisions_enabled = BooleanField("Teachers can decide assigned-student leave")
+    parent_leave_requests_enabled = BooleanField("Parents can submit leave requests")
+    portal_message = TextAreaField("Portal welcome message", validators=[DataRequired(), Length(max=1000)])
+    submit = SubmitField("Save settings")
+
+
+class UserAccountForm(FlaskForm):
+    email = StringField("Email", validators=[DataRequired(), Email()])
+    role = SelectField(
+        "Role",
+        choices=[
+            ("admin", "Administrator"),
+            ("headmaster", "Headmaster"),
+            ("dean", "Dean"),
+            ("teacher", "Teacher"),
+            ("parent", "Parent"),
+            ("student", "Student"),
+        ],
+        validators=[DataRequired()],
+    )
+    password = PasswordField("Temporary password", validators=[DataRequired(), Length(min=8)])
+    submit = SubmitField("Create user")
+
+
+class UserPasswordForm(FlaskForm):
+    user_id = SelectField("User account", coerce=int, validators=[DataRequired()])
+    password = PasswordField("New password", validators=[DataRequired(), Length(min=8)])
+    submit = SubmitField("Change password")
+
+
+class ProfileUserLinkForm(FlaskForm):
+    profile_ref = SelectField("Student / Parent / Teacher profile", validators=[DataRequired()])
+    user_id = SelectField("User account", coerce=int, validators=[DataRequired()])
+    submit = SubmitField("Connect account")
 
 
 class DateFilterForm(FlaskForm):

@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% block page_title %}Students{% endblock %}
 {% block content %}
+<div class="toolbar">
+  <form class="filter-grid" method="get">
+    <input class="form-control" name="q" value="{{ search }}" placeholder="Search child, code, grade, class">
+    <button class="btn btn-outline-primary">Search</button>
+  </form>
+</div>
 {% for child in children %}
 <section class="panel">
   <div class="panel-title-row">
@@ -20,5 +26,7 @@
     <div class="stat-card"><span>Leave Requests</span><strong>{{ child.leave_requests|length }}</strong></div>
   </div>
 </section>
+{% else %}
+<section class="panel"><p class="subtle">No students match your search.</p></section>
 {% endfor %}
 {% endblock %}

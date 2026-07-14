@@ -16,8 +16,23 @@
   <a class="btn btn-primary" href="{{ url_for('teacher.assignment_create') }}">Create Assignment</a>
 </div>
 <section class="panel">
-  <table class="table"><thead><tr><th>Title</th><th>Grade</th><th>Class</th><th>Due</th><th>Weight</th></tr></thead>
-    <tbody>{% for row in assignments %}<tr><td>{{ row.title }}</td><td>{{ row.school_class.year_group }}</td><td>{{ row.school_class.name }}</td><td>{{ row.due_date }}</td><td>{{ row.weight_pct }}%</td></tr>{% endfor %}</tbody>
-  </table>
+  {% for grade in grouped_assignments %}
+    <div class="group-section">
+      <h2>{{ grade.grade }}</h2>
+      {% for class_group in grade.classes %}
+        <section class="nested-panel">
+          <div class="panel-title-row">
+            <h2>{{ class_group.class.name }}</h2>
+            <span class="badge status-draft">{{ class_group.rows|length }} assignments</span>
+          </div>
+          <table class="table"><thead><tr><th>Title</th><th>Due</th><th>Max Mark</th><th>Weight</th></tr></thead>
+            <tbody>{% for row in class_group.rows %}<tr><td>{{ row.title }}</td><td>{{ row.due_date }}</td><td>{{ row.max_mark }}</td><td>{{ row.weight_pct }}%</td></tr>{% endfor %}</tbody>
+          </table>
+        </section>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="alert alert-info">No assignments match the selected grade and class.</div>
+  {% endfor %}
 </section>
 {% endblock %}

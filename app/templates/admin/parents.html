@@ -1,17 +1,42 @@
 {% extends "base.html" %}
 {% block page_title %}Parents{% endblock %}
+{% block page_subtitle %}Guardian directory with linked children and emergency contacts{% endblock %}
 {% block content %}
-<div class="toolbar"><div></div><a class="btn btn-primary" href="{{ url_for('admin.parent_create') }}">Add Parent</a></div>
+{% set child_counter = namespace(total=0) %}
+{% for parent in parents %}{% set child_counter.total = child_counter.total + parent.students|length %}{% endfor %}
+<div class="stat-grid">
+  <div class="stat-card"><span>Total Guardians</span><strong>{{ parents|length }}</strong></div>
+  <div class="stat-card"><span>Linked Children</span><strong>{{ child_counter.total }}</strong></div>
+  <div class="stat-card"><span>Emergency Contacts</span><strong>{{ parents|selectattr("emergency_contact")|list|length }}</strong></div>
+  <div class="stat-card"><span>Family Records</span><strong>{{ parents|length }}</strong></div>
+</div>
+<div class="toolbar">
+  <form class="filter-grid" method="get">
+    <input class="form-control" name="q" value="{{ search }}" placeholder="Search guardian, phone, child">
+    <select class="form-select" name="relationship">
+      <option value="">All relationships</option>
+      {% for relationship in relationships %}<option value="{{ relationship }}" {% if selected_relationship == relationship %}selected{% endif %}>{{ relationship|title }}</option>{% endfor %}
+    </select>
+    <select class="form-select" name="year_group">
+      <option value="">All grades</option>
+      {% for grade in grade_choices %}<option value="{{ grade }}" {% if selected_year_group == grade %}selected{% endif %}>{{ grade }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-outline-primary">Filter</button>
+  </form>
+  <a class="btn btn-primary" href="{{ url_for('admin.parent_create') }}">Add Parent</a>
+</div>
 <section class="panel">
   <table class="table">
-    <thead><tr><th>Name</th><th>Phone</th><th>Address</th><th>Children</th><th></th></tr></thead>
+    <thead><tr><th>Guardian</th><th>Relation</th><th>Phone</th><th>Address</th><th>Children</th><th>Emergency</th><th></th></tr></thead>
     <tbody>
     {% for parent in parents %}
       <tr>
         <td><a class="table-link" href="{{ url_for('admin.parent_detail', parent_id=parent.id) }}">{{ parent.full_name }}</a><small>{{ parent.user.email }}</small></td>
+        <td><span class="badge status-approved">{{ parent.relationship|title }}</span></td>
         <td>{{ parent.phone }}</td>
         <td>{{ parent.address }}</td>
         <td>{{ parent.students|map(attribute="full_name")|join(", ") or "No children linked" }}</td>
+        <td>{{ parent.emergency_contact or "Not recorded" }}</td>
         <td class="actions"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.parent_edit', parent_id=parent.id) }}">Edit</a></td>
       </tr>
     {% endfor %}

@@ -1,30 +1,55 @@
 {% extends "base.html" %}
 {% block page_title %}Teachers{% endblock %}
+{% block page_subtitle %}Teacher directory, departments, assignments, and staff records{% endblock %}
 {% block content %}
+{% set class_counter = namespace(total=0) %}
+{% for teacher in teachers %}{% set class_counter.total = class_counter.total + teacher.classes|length %}{% endfor %}
+<div class="stat-grid">
+  <div class="stat-card"><span>Total Teachers</span><strong>{{ teachers|length }}</strong></div>
+  <div class="stat-card"><span>Class Assignments</span><strong>{{ class_counter.total }}</strong></div>
+  <div class="stat-card"><span>Departments</span><strong>{{ teachers|map(attribute="department")|unique|list|length }}</strong></div>
+  <div class="stat-card"><span>Management Roles</span><strong>{{ teachers|selectattr("position", "in", ["dean", "headmaster"])|list|length }}</strong></div>
+</div>
 <div class="toolbar">
-  <div></div>
-  <a class="btn btn-primary" href="{{ url_for('admin.teacher_create') }}">Add Teacher</a>
+  <form class="filter-grid" method="get">
+    <input class="form-control" name="q" value="{{ search }}" placeholder="Search teacher, code, department">
+    <select class="form-select" name="department">
+      <option value="">All departments</option>
+      {% for department in departments %}<option value="{{ department }}" {% if selected_department == department %}selected{% endif %}>{{ department }}</option>{% endfor %}
+    </select>
+    <select class="form-select" name="position">
+      <option value="">All roles</option>
+      {% for position in positions %}<option value="{{ position }}" {% if selected_position == position %}selected{% endif %}>{{ position|title }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-outline-primary">Filter</button>
+  </form>
+  <a class="btn btn-primary" href="{{ url_for('admin.teacher_create') }}">Add New Teacher</a>
 </div>
 <section class="panel">
-  <table class="table">
-    <thead><tr><th>Name</th><th>Department</th><th>Code</th><th>Classes</th><th></th></tr></thead>
-    <tbody>
+  <div class="teacher-card-grid">
     {% for teacher in teachers %}
-      <tr>
-        <td><strong>{{ teacher.full_name }}</strong><small>{{ teacher.user.email }}</small></td>
-        <td>{{ teacher.department }}</td>
-        <td>{{ teacher.staff_code }}</td>
-        <td>{{ teacher.classes|length }}</td>
-        <td class="actions">
-          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.teacher_edit', teacher_id=teacher.id) }}">Edit</a>
+      <article class="teacher-card">
+        <div class="teacher-head">
+          <div class="teacher-avatar">{{ teacher.full_name[:1]|upper }}</div>
+          <div>
+            <h3>{{ teacher.full_name }}</h3>
+            <p>{{ teacher.department }} · {{ teacher.staff_code }}</p>
+          </div>
+        </div>
+        <div class="detail-grid">
+          <div><span>Role</span><strong>{{ teacher.position|title }}</strong></div>
+          <div><span>Classes</span><strong>{{ teacher.classes|length }}</strong></div>
+          <div><span>Email</span><strong>{{ teacher.user.email }}</strong></div>
+        </div>
+        <div class="teacher-card-footer">
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.teacher_edit', teacher_id=teacher.id) }}">Edit Profile</a>
           <form method="post" action="{{ url_for('admin.teacher_delete', teacher_id=teacher.id) }}" onsubmit="return confirm('Delete this teacher?')">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="btn btn-sm btn-outline-danger">Delete</button>
           </form>
-        </td>
-      </tr>
+        </div>
+      </article>
     {% endfor %}
-    </tbody>
-  </table>
+  </div>
 </section>
 {% endblock %}

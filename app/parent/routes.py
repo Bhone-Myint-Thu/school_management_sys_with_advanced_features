@@ -1,9 +1,9 @@
-from flask import Blueprint, Response, flash, redirect, render_template, url_for
+from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from ..extensions import db
 from ..forms import LeaveRequestForm, MessageForm
-from ..models import LeaveRequest, Message, Notice, Teacher, User
+from ..models import LeaveRequest, Message, Notice, SystemSetting, Teacher, User
 from ..security import roles_required
 from ..services import build_student_report_pdf
 
@@ -23,7 +23,19 @@ def dashboard():
 @login_required
 @roles_required("parent")
 def students():
-    return render_template("parent/students.html", children=current_user.parent.students)
+    search = request.args.get("q", "").strip()
+    children = current_user.parent.students
+    if search:
+        needle = search.lower()
+        children = [
+            child
+            for child in children
+            if needle in child.full_name.lower()
+            or needle in child.student_code.lower()
+            or needle in child.year_group.lower()
+            or any(needle in school_class.name.lower() or needle in school_class.subject.lower() for school_class in child.classes)
+        ]
+    return render_template("parent/students.html", children=children, search=search)
 
 
 @bp.route("/students/<int:student_id>")
@@ -51,9 +63,13 @@ def student_timetable(student_id):
 @login_required
 @roles_required("parent")
 def leave():
+    settings = SystemSetting.current()
     form = LeaveRequestForm()
     form.student_id.choices = [(student.id, student.full_name) for student in current_user.parent.students]
     if form.validate_on_submit():
+        if not settings.parent_leave_requests_enabled:
+            flash("Parent leave requests are disabled in system settings.", "warning")
+            return redirect(url_for("parent.leave"))
         student_ids = {student.id for student in current_user.parent.students}
         if form.student_id.data not in student_ids:
             return ("Not found", 404)
@@ -72,7 +88,7 @@ def leave():
     rows = LeaveRequest.query.filter(LeaveRequest.student_id.in_([student.id for student in current_user.parent.students])).order_by(
         LeaveRequest.created_at.desc()
     )
-    return render_template("parent/leave.html", form=form, leave_requests=rows)
+    return render_template("parent/leave.html", form=form, leave_requests=rows, settings=settings)
 
 
 @bp.route("/messages", methods=["GET", "POST"])

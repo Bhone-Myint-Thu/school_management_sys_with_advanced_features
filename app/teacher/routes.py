@@ -6,7 +6,7 @@ from flask_login import current_user, login_required
 from ..extensions import db
 from ..access import can_manage_leave, can_view_student, visible_students_query
 from ..forms import AssignmentForm, AttendanceForm, GradeForm, LeaveDecisionForm, MessageForm
-from ..models import Assignment, Attendance, Grade, LeaveRequest, Notice, Parent, SchoolClass, Student, User, letter_for_mark
+from ..models import Assignment, Attendance, Grade, LeaveRequest, Notice, Parent, SchoolClass, Student, SystemSetting, User, letter_for_mark
 from ..security import roles_required
 from ..services import send_attendance_alert
 
@@ -22,13 +22,17 @@ def _grade_choices():
 
 
 def _filter_students(query):
+    search = request.args.get("q", "").strip()
     year_group = request.args.get("year_group", "").strip()
     class_id = request.args.get("class_id", type=int) or 0
+    if search:
+        pattern = f"%{search}%"
+        query = query.filter((Student.full_name.ilike(pattern)) | (Student.student_code.ilike(pattern)) | (Student.user.has(User.email.ilike(pattern))))
     if year_group:
         query = query.filter(Student.year_group == year_group)
     if class_id:
         query = query.filter(Student.classes.any(SchoolClass.id == class_id))
-    return query, year_group, class_id
+    return query, search, year_group, class_id
 
 
 def _filter_teacher_classes(query):
@@ -39,6 +43,59 @@ def _filter_teacher_classes(query):
     if class_id:
         query = query.filter(SchoolClass.id == class_id)
     return query, year_group, class_id
+
+
+def _teacher_class_context():
+    year_group = request.args.get("year_group", "").strip()
+    class_id = request.args.get("class_id", type=int) or 0
+    query = SchoolClass.query.filter_by(teacher_id=current_user.teacher.id)
+    if year_group:
+        query = query.filter(SchoolClass.year_group == year_group)
+    classes = query.order_by(SchoolClass.year_group, SchoolClass.name).all()
+    if class_id and class_id not in {row.id for row in classes}:
+        class_id = 0
+    return year_group, class_id, classes
+
+
+def _visible_students_for_context(year_group="", class_id=0):
+    query = visible_students_query()
+    if year_group:
+        query = query.filter(Student.year_group == year_group)
+    if class_id:
+        query = query.filter(Student.classes.any(SchoolClass.id == class_id))
+    return query.order_by(Student.full_name).all()
+
+
+def _assignments_for_context(year_group="", class_id=0):
+    query = Assignment.query.join(SchoolClass).filter(SchoolClass.teacher_id == current_user.teacher.id)
+    if year_group:
+        query = query.filter(SchoolClass.year_group == year_group)
+    if class_id:
+        query = query.filter(Assignment.class_id == class_id)
+    return query.order_by(SchoolClass.year_group, SchoolClass.name, Assignment.due_date).all()
+
+
+def _group_by_grade_class(rows, class_getter):
+    grouped = []
+    grade_map = {}
+    for row in rows:
+        school_class = class_getter(row)
+        grade = school_class.year_group
+        class_name = school_class.name
+        grade_bucket = grade_map.get(grade)
+        if grade_bucket is None:
+            grade_bucket = {"grade": grade, "classes": [], "_class_map": {}}
+            grade_map[grade] = grade_bucket
+            grouped.append(grade_bucket)
+        class_bucket = grade_bucket["_class_map"].get(class_name)
+        if class_bucket is None:
+            class_bucket = {"class": school_class, "rows": []}
+            grade_bucket["_class_map"][class_name] = class_bucket
+            grade_bucket["classes"].append(class_bucket)
+        class_bucket["rows"].append(row)
+    for grade_bucket in grouped:
+        grade_bucket.pop("_class_map", None)
+    return grouped
 
 
 @bp.route("/")
@@ -63,18 +120,13 @@ def dashboard():
 @login_required
 @roles_required("teacher")
 def students():
-    year_group = request.args.get("year_group", "").strip()
-    class_id = request.args.get("class_id", type=int) or 0
-    rows = visible_students_query()
-    if year_group:
-        rows = rows.filter(Student.year_group == year_group)
-    if class_id:
-        rows = rows.filter(Student.classes.any(SchoolClass.id == class_id))
+    rows, search, year_group, class_id = _filter_students(visible_students_query())
     return render_template(
         "teacher/students.html",
         students=rows.order_by(Student.full_name).all(),
         classes=_teacher_classes(),
         grade_choices=_grade_choices(),
+        search=search,
         selected_year_group=year_group,
         selected_class_id=class_id,
     )
@@ -96,13 +148,16 @@ def student_detail(student_id):
 def leave():
     students = visible_students_query().all()
     rows = LeaveRequest.query.filter(LeaveRequest.student_id.in_([student.id for student in students])).order_by(LeaveRequest.created_at.desc()).all()
-    return render_template("teacher/leave.html", leave_requests=rows)
+    return render_template("teacher/leave.html", leave_requests=rows, settings=SystemSetting.current())
 
 
 @bp.route("/leave/<int:leave_id>/set/<status>", methods=["POST"])
 @login_required
 @roles_required("teacher")
 def leave_set_status(leave_id, status):
+    if not SystemSetting.current().teacher_leave_decisions_enabled:
+        flash("Teacher leave decisions are disabled in system settings.", "warning")
+        return redirect(url_for("teacher.leave_detail", leave_id=leave_id))
     if status not in {"draft", "approved", "refused"}:
         return ("Bad request", 400)
     row = db.get_or_404(LeaveRequest, leave_id)
@@ -127,14 +182,18 @@ def leave_detail(leave_id):
     row = db.get_or_404(LeaveRequest, leave_id)
     if not can_manage_leave(row):
         return ("Forbidden", 403)
+    settings = SystemSetting.current()
     form = LeaveDecisionForm()
     if form.validate_on_submit():
+        if not settings.teacher_leave_decisions_enabled:
+            flash("Teacher leave decisions are disabled in system settings.", "warning")
+            return redirect(url_for("teacher.leave_detail", leave_id=row.id))
         row.status = form.status.data
         row.response_note = form.response_note.data
         db.session.commit()
         flash("Leave request updated.", "success")
         return redirect(url_for("teacher.leave_detail", leave_id=row.id))
-    return render_template("teacher/leave_detail.html", leave_request=row, form=form)
+    return render_template("teacher/leave_detail.html", leave_request=row, form=form, settings=settings)
 
 
 @bp.route("/attendance", methods=["GET", "POST"])
@@ -148,9 +207,14 @@ def attendance():
 @login_required
 @roles_required("teacher")
 def attendance_create():
+    selected_year_group, selected_class_id, scoped_classes = _teacher_class_context()
     form = AttendanceForm(session_date=date.today())
-    form.class_id.choices = [(row.id, row.name) for row in _teacher_classes()]
-    form.student_id.choices = [(row.id, row.full_name) for row in visible_students_query().order_by(Student.full_name)]
+    form.class_id.choices = [(row.id, f"{row.year_group} - {row.name}") for row in scoped_classes]
+    form.student_id.choices = [
+        (row.id, f"{row.full_name} ({row.year_group})") for row in _visible_students_for_context(selected_year_group, selected_class_id)
+    ]
+    if selected_class_id and request.method == "GET":
+        form.class_id.data = selected_class_id
     if form.validate_on_submit():
         row = Attendance.query.filter_by(
             class_id=form.class_id.data,
@@ -164,7 +228,15 @@ def attendance_create():
         send_attendance_alert(row.student)
         flash("Attendance saved.", "success")
         return redirect(url_for("teacher.attendance_records"))
-    return render_template("teacher/attendance_create.html", form=form)
+    return render_template(
+        "teacher/attendance_create.html",
+        form=form,
+        classes=_teacher_classes(),
+        scoped_classes=scoped_classes,
+        grade_choices=_grade_choices(),
+        selected_year_group=selected_year_group,
+        selected_class_id=selected_class_id,
+    )
 
 
 @bp.route("/attendance/records")
@@ -173,10 +245,16 @@ def attendance_create():
 def attendance_records():
     class_query, year_group, class_id = _filter_teacher_classes(SchoolClass.query.filter_by(teacher_id=current_user.teacher.id))
     class_ids = [row.id for row in class_query.all()]
-    records = Attendance.query.filter(Attendance.class_id.in_(class_ids)).order_by(Attendance.session_date.desc()).all()
+    records = (
+        Attendance.query.join(SchoolClass)
+        .filter(Attendance.class_id.in_(class_ids))
+        .order_by(SchoolClass.year_group, SchoolClass.name, Attendance.session_date.desc())
+        .all()
+    )
     return render_template(
         "teacher/attendance_records.html",
         records=records,
+        grouped_records=_group_by_grade_class(records, lambda row: row.school_class),
         classes=_teacher_classes(),
         grade_choices=_grade_choices(),
         selected_year_group=year_group,
@@ -195,8 +273,11 @@ def assignments():
 @login_required
 @roles_required("teacher")
 def assignment_create():
+    selected_year_group, selected_class_id, scoped_classes = _teacher_class_context()
     form = AssignmentForm()
-    form.class_id.choices = [(row.id, row.name) for row in _teacher_classes()]
+    form.class_id.choices = [(row.id, f"{row.year_group} - {row.name}") for row in scoped_classes]
+    if selected_class_id and request.method == "GET":
+        form.class_id.data = selected_class_id
     if form.validate_on_submit():
         assignment = Assignment(
             class_id=form.class_id.data,
@@ -209,7 +290,15 @@ def assignment_create():
         db.session.commit()
         flash("Assignment saved.", "success")
         return redirect(url_for("teacher.assignment_records"))
-    return render_template("teacher/assignment_create.html", form=form)
+    return render_template(
+        "teacher/assignment_create.html",
+        form=form,
+        classes=_teacher_classes(),
+        scoped_classes=scoped_classes,
+        grade_choices=_grade_choices(),
+        selected_year_group=selected_year_group,
+        selected_class_id=selected_class_id,
+    )
 
 
 @bp.route("/assignments/records")
@@ -218,10 +307,16 @@ def assignment_create():
 def assignment_records():
     class_query, year_group, class_id = _filter_teacher_classes(SchoolClass.query.filter_by(teacher_id=current_user.teacher.id))
     class_ids = [row.id for row in class_query.all()]
-    rows = Assignment.query.filter(Assignment.class_id.in_(class_ids)).order_by(Assignment.due_date).all()
+    rows = (
+        Assignment.query.join(SchoolClass)
+        .filter(Assignment.class_id.in_(class_ids))
+        .order_by(SchoolClass.year_group, SchoolClass.name, Assignment.due_date)
+        .all()
+    )
     return render_template(
         "teacher/assignment_records.html",
         assignments=rows,
+        grouped_assignments=_group_by_grade_class(rows, lambda row: row.school_class),
         classes=_teacher_classes(),
         grade_choices=_grade_choices(),
         selected_year_group=year_group,
@@ -240,12 +335,15 @@ def grades():
 @login_required
 @roles_required("teacher")
 def grade_create():
+    selected_year_group, selected_class_id, scoped_classes = _teacher_class_context()
     form = GradeForm()
     form.assignment_id.choices = [
         (row.id, f"{row.school_class.subject}: {row.title}")
-        for row in Assignment.query.join(SchoolClass).filter(SchoolClass.teacher_id == current_user.teacher.id)
+        for row in _assignments_for_context(selected_year_group, selected_class_id)
     ]
-    form.student_id.choices = [(row.id, row.full_name) for row in visible_students_query().order_by(Student.full_name)]
+    form.student_id.choices = [
+        (row.id, f"{row.full_name} ({row.year_group})") for row in _visible_students_for_context(selected_year_group, selected_class_id)
+    ]
     if form.validate_on_submit():
         assignment = db.session.get(Assignment, form.assignment_id.data)
         grade = Grade.query.filter_by(assignment_id=assignment.id, student_id=form.student_id.data).first() or Grade(
@@ -258,7 +356,15 @@ def grade_create():
         db.session.commit()
         flash("Grade saved.", "success")
         return redirect(url_for("teacher.grade_records"))
-    return render_template("teacher/grade_create.html", form=form)
+    return render_template(
+        "teacher/grade_create.html",
+        form=form,
+        classes=_teacher_classes(),
+        scoped_classes=scoped_classes,
+        grade_choices=_grade_choices(),
+        selected_year_group=selected_year_group,
+        selected_class_id=selected_class_id,
+    )
 
 
 @bp.route("/grades/records")
@@ -267,10 +373,17 @@ def grade_create():
 def grade_records():
     class_query, year_group, class_id = _filter_teacher_classes(SchoolClass.query.filter_by(teacher_id=current_user.teacher.id))
     class_ids = [row.id for row in class_query.all()]
-    rows = Grade.query.join(Assignment).filter(Assignment.class_id.in_(class_ids)).order_by(Grade.graded_at.desc()).all()
+    rows = (
+        Grade.query.join(Assignment)
+        .join(SchoolClass)
+        .filter(Assignment.class_id.in_(class_ids))
+        .order_by(SchoolClass.year_group, SchoolClass.name, Grade.graded_at.desc())
+        .all()
+    )
     return render_template(
         "teacher/grade_records.html",
         grades=rows,
+        grouped_grades=_group_by_grade_class(rows, lambda row: row.assignment.school_class),
         classes=_teacher_classes(),
         grade_choices=_grade_choices(),
         selected_year_group=year_group,

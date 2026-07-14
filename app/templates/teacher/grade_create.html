@@ -1,10 +1,24 @@
 {% extends "base.html" %}
 {% block page_title %}Enter Grade{% endblock %}
 {% block content %}
+<div class="toolbar">
+  <form class="filter-grid" method="get">
+    <select class="form-select" name="year_group">
+      <option value="">Choose grade</option>
+      {% for grade in grade_choices %}<option value="{{ grade }}" {% if selected_year_group == grade %}selected{% endif %}>{{ grade }}</option>{% endfor %}
+    </select>
+    <select class="form-select" name="class_id">
+      <option value="0">Choose class</option>
+      {% for class in scoped_classes %}<option value="{{ class.id }}" {% if selected_class_id == class.id %}selected{% endif %}>{{ class.name }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-primary">Apply</button>
+  </form>
+  <a class="btn btn-outline-primary" href="{{ url_for('teacher.grade_records') }}">Grade Records</a>
+</div>
 <section class="panel narrow">
   <div class="panel-title-row">
     <h2>Enter Grade</h2>
-    <a class="btn btn-outline-primary" href="{{ url_for('teacher.grade_records') }}">Grade Records</a>
+    <span class="badge status-draft">Grade then class</span>
   </div>
   <form method="post">{% include "partials/form.html" %}</form>
 </section>

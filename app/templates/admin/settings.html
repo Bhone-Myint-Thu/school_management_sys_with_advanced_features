@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block page_title %}Settings{% endblock %}
+{% block page_subtitle %}System configuration and user account administration{% endblock %}
+{% block content %}
+<div class="settings-tabs">
+  <a class="{% if active_tab == 'system' %}active{% endif %}" href="{{ url_for('admin.settings', tab='system') }}">System Settings</a>
+  <a class="{% if active_tab == 'create-user' %}active{% endif %}" href="{{ url_for('admin.settings', tab='create-user') }}">Create User</a>
+  <a class="{% if active_tab == 'change-password' %}active{% endif %}" href="{{ url_for('admin.settings', tab='change-password') }}">Change Password</a>
+  <a class="{% if active_tab == 'connect-account' %}active{% endif %}" href="{{ url_for('admin.settings', tab='connect-account') }}">Connect Account</a>
+  <a class="{% if active_tab == 'account-directory' %}active{% endif %}" href="{{ url_for('admin.settings', tab='account-directory') }}">Account Directory</a>
+</div>
+
+{% if active_tab == 'system' %}
+  <div class="stat-grid">
+    <div class="stat-card"><span>School Name</span><strong>{{ settings.school_name }}</strong></div>
+    <div class="stat-card"><span>Academic Session</span><strong>{{ settings.academic_session }}</strong></div>
+    <div class="stat-card"><span>Attendance Alert</span><strong>{{ settings.attendance_alert_threshold|round(1) }}%</strong></div>
+    <div class="stat-card"><span>Grades</span><strong>{{ settings.default_grade_start }}-{{ settings.default_grade_end }}</strong></div>
+  </div>
+
+  <form method="post">
+    {{ form.hidden_tag() }}
+    <div class="grid-2">
+      <section class="panel">
+        <div class="panel-title-row">
+          <h2>School Profile</h2>
+          <span class="badge status-approved">Live in header</span>
+        </div>
+        <div class="grid-2">
+          <div class="form-field">
+            {{ form.school_name.label(class="form-label") }}
+            {{ form.school_name(class="form-control") }}
+          </div>
+          <div class="form-field">
+            {{ form.academic_session.label(class="form-label") }}
+            {{ form.academic_session(class="form-control") }}
+          </div>
+        </div>
+        <div class="form-field">
+          {{ form.timezone.label(class="form-label") }}
+          {{ form.timezone(class="form-control") }}
+        </div>
+        <div class="form-field">
+          {{ form.portal_message.label(class="form-label") }}
+          {{ form.portal_message(class="form-control", rows=4) }}
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title-row">
+          <h2>Academic Defaults</h2>
+          <span class="badge status-draft">Grade range</span>
+        </div>
+        <div class="grid-2">
+          <div class="form-field">
+            {{ form.default_grade_start.label(class="form-label") }}
+            {{ form.default_grade_start(class="form-control") }}
+          </div>
+          <div class="form-field">
+            {{ form.default_grade_end.label(class="form-label") }}
+            {{ form.default_grade_end(class="form-control") }}
+            {% for error in form.default_grade_end.errors %}<div class="form-text text-danger">{{ error }}</div>{% endfor %}
+          </div>
+        </div>
+        <div class="form-field">
+          {{ form.attendance_alert_threshold.label(class="form-label") }}
+          {{ form.attendance_alert_threshold(class="form-control", step="0.1") }}
+        </div>
+        <div class="form-field">
+          {{ form.attendance_mode.label(class="form-label") }}
+          {{ form.attendance_mode(class="form-select") }}
+        </div>
+      </section>
+    </div>
+
+    <div class="grid-2">
+      <section class="panel">
+        <div class="panel-title-row">
+          <h2>Workflow Rules</h2>
+          <span class="badge status-approved">Access controls</span>
+        </div>
+        <div class="settings-toggle-list">
+          <label class="settings-toggle">
+            {{ form.notice_approval_required() }}
+            <span><strong>{{ form.notice_approval_required.label.text }}</strong><small>Dean notices stay pending until Headmaster approval.</small></span>
+          </label>
+          <label class="settings-toggle">
+            {{ form.teacher_leave_decisions_enabled() }}
+            <span><strong>{{ form.teacher_leave_decisions_enabled.label.text }}</strong><small>Teachers can approve, refuse, or reset leave for assigned students.</small></span>
+          </label>
+          <label class="settings-toggle">
+            {{ form.parent_leave_requests_enabled() }}
+            <span><strong>{{ form.parent_leave_requests_enabled.label.text }}</strong><small>Parents can create leave requests for linked children.</small></span>
+          </label>
+        </div>
+        <div class="form-field mt-4">
+          {{ form.default_notice_audience.label(class="form-label") }}
+          {{ form.default_notice_audience(class="form-select") }}
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title-row">
+          <h2>Current Configuration</h2>
+          <span class="badge status-approved">Saved</span>
+        </div>
+        <div class="detail-grid">
+          <div><span>Notice Approval</span><strong>{{ "Required" if settings.notice_approval_required else "Not required" }}</strong></div>
+          <div><span>Teacher Leave</span><strong>{{ "Enabled" if settings.teacher_leave_decisions_enabled else "Disabled" }}</strong></div>
+          <div><span>Parent Leave</span><strong>{{ "Enabled" if settings.parent_leave_requests_enabled else "Disabled" }}</strong></div>
+          <div><span>Attendance Mode</span><strong>{{ settings.attendance_mode.replace("_", " ")|title }}</strong></div>
+          <div><span>Default Audience</span><strong>{{ settings.default_notice_audience|title }}</strong></div>
+          <div><span>Last Updated</span><strong>{{ settings.updated_at.strftime("%Y-%m-%d %H:%M") if settings.updated_at else "Not saved yet" }}</strong></div>
+        </div>
+        <div class="settings-preview">
+          <span>Portal Message Preview</span>
+          <p>{{ settings.portal_message }}</p>
+        </div>
+      </section>
+    </div>
+
+    <div class="settings-actions">
+      {{ form.submit(class="btn btn-primary") }}
+      <a class="btn btn-outline-primary" href="{{ url_for('admin.settings', tab='system') }}">Reset Form</a>
+    </div>
+  </form>
+
+{% elif active_tab == 'create-user' %}
+  <section class="panel narrow">
+    <div class="panel-title-row">
+      <div>
+        <h2>Create User</h2>
+        <p class="subtle">Create a login account first, then connect it to a student, parent, or teacher profile.</p>
+      </div>
+    </div>
+    <form method="post" action="{{ url_for('admin.setting_user_create') }}">
+      {{ account_form.hidden_tag() }}
+      <div class="form-field">
+        {{ account_form.email.label(class="form-label") }}
+        {{ account_form.email(class="form-control", placeholder="new.user@sms.example.com") }}
+      </div>
+      <div class="form-field">
+        {{ account_form.role.label(class="form-label") }}
+        {{ account_form.role(class="form-select") }}
+      </div>
+      <div class="form-field">
+        {{ account_form.password.label(class="form-label") }}
+        {{ account_form.password(class="form-control", placeholder="At least 8 characters") }}
+      </div>
+      {{ account_form.submit(class="btn btn-primary") }}
+    </form>
+  </section>
+
+{% elif active_tab == 'change-password' %}
+  <section class="panel narrow">
+    <div class="panel-title-row">
+      <div>
+        <h2>Change Password</h2>
+        <p class="subtle">Reset or update the password for any existing user account.</p>
+      </div>
+    </div>
+    <form method="post" action="{{ url_for('admin.setting_user_password') }}">
+      {{ password_form.hidden_tag() }}
+      <div class="form-field">
+        {{ password_form.user_id.label(class="form-label") }}
+        {{ password_form.user_id(class="form-select") }}
+      </div>
+      <div class="form-field">
+        {{ password_form.password.label(class="form-label") }}
+        {{ password_form.password(class="form-control", placeholder="New password") }}
+      </div>
+      {{ password_form.submit(class="btn btn-primary") }}
+    </form>
+  </section>
+
+{% elif active_tab == 'connect-account' %}
+  <section class="panel narrow">
+    <div class="panel-title-row">
+      <div>
+        <h2>Connect Account</h2>
+        <p class="subtle">Connect the selected user account to the correct student, parent, or teacher profile.</p>
+      </div>
+    </div>
+    <form method="post" action="{{ url_for('admin.setting_user_link') }}">
+      {{ link_form.hidden_tag() }}
+      <div class="form-field">
+        {{ link_form.profile_ref.label(class="form-label") }}
+        {{ link_form.profile_ref(class="form-select") }}
+      </div>
+      <div class="form-field">
+        {{ link_form.user_id.label(class="form-label") }}
+        {{ link_form.user_id(class="form-select") }}
+      </div>
+      {{ link_form.submit(class="btn btn-primary") }}
+    </form>
+  </section>
+
+{% elif active_tab == 'account-directory' %}
+  <section class="panel">
+    <div class="panel-title-row">
+      <div>
+        <h2>Account Directory</h2>
+        <p class="subtle">Review login accounts and their connected profiles.</p>
+      </div>
+      <span class="badge status-approved">{{ users|length }} accounts</span>
+    </div>
+    <table class="table">
+      <thead><tr><th>Email</th><th>Role</th><th>Connected Profile</th></tr></thead>
+      <tbody>
+      {% for user in users %}
+        <tr>
+          <td>{{ user.email }}</td>
+          <td><span class="badge status-draft">{{ user.role|title }}</span></td>
+          <td>
+            {% if user.student %}
+              Student - {{ user.student.full_name }}
+            {% elif user.parent %}
+              Parent - {{ user.parent.full_name }}
+            {% elif user.teacher %}
+              Teacher - {{ user.teacher.full_name }}
+            {% else %}
+              <span class="text-muted">Not connected</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+{% endif %}
+{% endblock %}

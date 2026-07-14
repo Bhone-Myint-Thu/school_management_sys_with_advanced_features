@@ -1,27 +1,42 @@
 {% extends "base.html" %}
 {% block page_title %}Notice Dashboard{% endblock %}
+{% block page_subtitle %}Create announcements, request approval, and publish notices by audience{% endblock %}
 {% block content %}
+<div class="stat-grid">
+  <div class="stat-card"><span>Total Notices</span><strong>{{ notices|length }}</strong></div>
+  <div class="stat-card"><span>Pending Approval</span><strong>{{ notices|selectattr("status", "equalto", "pending")|list|length }}</strong></div>
+  <div class="stat-card"><span>Published</span><strong>{{ notices|selectattr("status", "equalto", "approved")|list|length }}</strong></div>
+  <div class="stat-card"><span>Audiences</span><strong>3</strong></div>
+</div>
 <div class="grid-2">
   <section class="panel">
     <h2>{% if current_user.role == "headmaster" %}Announce Notice{% else %}Request Notice Approval{% endif %}</h2>
     <form method="post">{% include "partials/form.html" %}</form>
   </section>
   <section class="panel">
-    <h2>Notice Queue</h2>
-    <table class="table">
-      <thead><tr><th>Title</th><th>Audience</th><th>Status</th><th>Requested By</th><th></th></tr></thead>
-      <tbody>
+    <div class="panel-title-row">
+      <h2>Announcements Feed</h2>
+      <span class="badge status-approved">Live Preview</span>
+    </div>
+    <div class="notice-list">
       {% for notice in notices %}
-        <tr>
-          <td>{{ notice.title }}<small>{{ notice.body }}</small></td>
-          <td>{{ notice.audience|title }}</td>
-          <td><span class="badge status-{{ notice.status }}">{{ notice.status|title }}</span></td>
-          <td>{{ notice.requested_by.display_name }}</td>
-          <td>{% if current_user.role == "headmaster" and notice.status == "pending" %}<form method="post" action="{{ url_for('admin.notice_approve', notice_id=notice.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-primary">Approve</button></form>{% endif %}</td>
-        </tr>
+        <article>
+          <strong>{{ notice.title }}</strong>
+          <p>{{ notice.body }}</p>
+          <p>
+            <span class="badge status-{{ notice.status }}">{{ notice.status|title }}</span>
+            <span class="badge status-draft">{{ notice.audience|title }}</span>
+            Requested by {{ notice.requested_by.display_name }}
+          </p>
+          {% if current_user.role == "headmaster" and notice.status == "pending" %}
+            <form method="post" action="{{ url_for('admin.notice_approve', notice_id=notice.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-primary">Approve Announcement</button>
+            </form>
+          {% endif %}
+        </article>
       {% endfor %}
-      </tbody>
-    </table>
+    </div>
   </section>
 </div>
 {% endblock %}

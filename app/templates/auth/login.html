@@ -3,20 +3,41 @@
 {% block auth_content %}
 <section class="login-panel">
   <div class="login-copy">
-    <p class="eyebrow">Web-Based School Management System</p>
-    <h1>Sign in to the school portal</h1>
-    <p>Manage students, attendance, grades, leave requests, messaging, and academic reports from one secure portal.</p>
+    <div class="login-brand"><span class="brand-mark">E</span><span>EduManage Pro</span></div>
+    <div class="login-copy-main">
+      <p class="eyebrow">Web-Based School Management System</p>
+      <h1>Sign in to the school portal</h1>
+      <p>Manage students, attendance, grades, leave requests, notices, messaging, and academic records from one secure workspace.</p>
+    </div>
+    <p class="eyebrow">Internal Access</p>
   </div>
   <form method="post" class="login-card">
+    <span class="login-pill">Internal Access</span>
     <h2>Welcome back</h2>
     <p class="form-hint">Use a demo account to explore each role.</p>
-    {% include "partials/form.html" %}
+    {{ form.hidden_tag() }}
+    <div class="form-field">
+      {{ form.email.label(class="form-label") }}
+      {{ form.email(class="form-control", placeholder="admin@sms.example.com") }}
+      {% for error in form.email.errors %}<div class="form-text text-danger">{{ error }}</div>{% endfor %}
+    </div>
+    <div class="form-field">
+      {{ form.password.label(class="form-label") }}
+      {{ form.password(class="form-control", placeholder="Password123") }}
+      {% for error in form.password.errors %}<div class="form-text text-danger">{{ error }}</div>{% endfor %}
+    </div>
+    <div class="login-options">
+      <label class="checkline"><input type="checkbox"> Keep me signed in</label>
+      <a class="forgot-link" href="#">Forgot password?</a>
+    </div>
+    {{ form.submit(class="btn btn-primary btn-block", value="Sign in to Dashboard") }}
+    <p class="auth-switch">New to the portal? <a class="forgot-link" href="{{ url_for('auth.signup') }}">Create an account</a></p>
     <div class="demo-logins">
       <strong>Demo logins</strong>
-      <span>admin@sms.example.com</span>
-      <span>teacher@sms.example.com</span>
-      <span>parent@sms.example.com</span>
-      <span>student@sms.example.com</span>
+      <span class="demo-row"><span class="demo-role">Admin</span>admin@sms.example.com</span>
+      <span class="demo-row"><span class="demo-role">Teacher</span>teacher@sms.example.com</span>
+      <span class="demo-row"><span class="demo-role">Parent</span>parent@sms.example.com</span>
+      <span class="demo-row"><span class="demo-role">Student</span>student@sms.example.com</span>
       <small>Password: Password123</small>
     </div>
   </form>

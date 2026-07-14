@@ -1,5 +1,7 @@
 from test_auth import login
 
+from app.models import User
+
 
 def test_parent_can_download_child_report(client):
     login(client, "parent@sms.example.com")
@@ -87,8 +89,98 @@ def test_management_detail_pages_load(client):
         "/admin/timetable",
         "/admin/timetable/1",
         "/admin/leave/1",
+        "/admin/settings",
     ]:
         assert client.get(path).status_code == 200
+
+
+def test_admin_teacher_and_parent_search_filters(client):
+    login(client, "admin@sms.example.com")
+    response = client.get("/admin/teachers?q=T-1001")
+    assert b"Daw May Hnin" in response.data
+
+    response = client.get("/admin/parents?q=Min Thu")
+    assert b"U Aung Ko" in response.data
+
+
+def test_global_search_dispatches_to_role_student_list(client):
+    login(client, "teacher@sms.example.com")
+    response = client.get("/search?q=Min", follow_redirects=True)
+    assert b"Students List" in response.data
+    assert b"Min Thu" in response.data
+    assert b"Hnin Thu" not in response.data
+
+
+def test_management_settings_can_be_updated(client):
+    login(client, "admin@sms.example.com")
+    response = client.post(
+        "/admin/settings",
+        data={
+            "school_name": "Future Leaders School",
+            "academic_session": "2027-28",
+            "timezone": "Asia/Yangon",
+            "attendance_alert_threshold": "90",
+            "default_grade_start": "1",
+            "default_grade_end": "12",
+            "attendance_mode": "daily_class",
+            "default_notice_audience": "teachers",
+            "notice_approval_required": "y",
+            "teacher_leave_decisions_enabled": "y",
+            "parent_leave_requests_enabled": "y",
+            "portal_message": "Welcome back to the portal.",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"System settings updated." in response.data
+    assert b"Future Leaders School" in response.data
+    assert b"2027-28" in response.data
+
+
+def test_settings_can_create_user_change_password_and_link_profile(client):
+    login(client, "admin@sms.example.com")
+    response = client.post(
+        "/admin/settings/users/create",
+        data={
+            "account-email": "aye.login@sms.example.com",
+            "account-role": "student",
+            "account-password": "OldPass123",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"User account created" in response.data
+
+    with client.application.app_context():
+        user = User.query.filter_by(email="aye.login@sms.example.com").one()
+        user_id = user.id
+
+    response = client.post(
+        "/admin/settings/users/password",
+        data={"password-user_id": user_id, "password-password": "NewPass123"},
+        follow_redirects=True,
+    )
+    assert b"User password changed." in response.data
+
+    response = client.post(
+        "/admin/settings/users/link",
+        data={"link-profile_ref": "student:3", "link-user_id": user_id},
+        follow_redirects=True,
+    )
+    assert b"User account connected to profile." in response.data
+
+    client.post("/auth/logout")
+    response = login(client, "aye.login@sms.example.com", "NewPass123")
+    assert b"Student Dashboard" in response.data
+
+
+def test_notifications_can_be_marked_read(client):
+    login(client, "parent@sms.example.com")
+    response = client.get("/parent/")
+    assert b"1 unread" in response.data
+    response = client.post("/notifications/read", follow_redirects=True)
+    assert response.status_code == 200
+    assert b"0 unread" in response.data
 
 
 def test_parent_student_detail_and_timetable_load(client):

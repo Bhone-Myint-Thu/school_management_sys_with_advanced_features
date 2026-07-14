@@ -4,7 +4,11 @@
 <div class="grid-2">
   <section class="panel">
     <h2>Submit Leave Request</h2>
-    <form method="post">{% include "partials/form.html" %}</form>
+    {% if settings.parent_leave_requests_enabled %}
+      <form method="post">{% include "partials/form.html" %}</form>
+    {% else %}
+      <div class="alert alert-warning">Parent leave requests are disabled in system settings.</div>
+    {% endif %}
   </section>
   <section class="panel">
     <h2>Leave History</h2>

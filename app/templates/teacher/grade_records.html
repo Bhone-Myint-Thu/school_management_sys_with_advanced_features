@@ -16,8 +16,23 @@
   <a class="btn btn-primary" href="{{ url_for('teacher.grade_create') }}">Enter Grade</a>
 </div>
 <section class="panel">
-  <table class="table"><thead><tr><th>Student</th><th>Grade</th><th>Assignment</th><th>Mark</th><th>Letter</th></tr></thead>
-    <tbody>{% for row in grades %}<tr><td><a class="table-link" href="{{ url_for('teacher.student_detail', student_id=row.student.id) }}">{{ row.student.full_name }}</a></td><td>{{ row.student.year_group }}</td><td>{{ row.assignment.title }}</td><td>{{ row.mark }}/{{ row.assignment.max_mark }}</td><td>{{ row.letter_grade }}</td></tr>{% endfor %}</tbody>
-  </table>
+  {% for grade in grouped_grades %}
+    <div class="group-section">
+      <h2>{{ grade.grade }}</h2>
+      {% for class_group in grade.classes %}
+        <section class="nested-panel">
+          <div class="panel-title-row">
+            <h2>{{ class_group.class.name }}</h2>
+            <span class="badge status-draft">{{ class_group.rows|length }} grades</span>
+          </div>
+          <table class="table"><thead><tr><th>Student</th><th>Assignment</th><th>Mark</th><th>Letter</th></tr></thead>
+            <tbody>{% for row in class_group.rows %}<tr><td><a class="table-link" href="{{ url_for('teacher.student_detail', student_id=row.student.id) }}">{{ row.student.full_name }}</a></td><td>{{ row.assignment.title }}</td><td>{{ row.mark }}/{{ row.assignment.max_mark }}</td><td>{{ row.letter_grade }}</td></tr>{% endfor %}</tbody>
+          </table>
+        </section>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="alert alert-info">No grade records match the selected grade and class.</div>
+  {% endfor %}
 </section>
 {% endblock %}

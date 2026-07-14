@@ -11,6 +11,7 @@ from .models import (
     Parent,
     SchoolClass,
     Student,
+    SystemSetting,
     Teacher,
     Timetable,
     User,
@@ -33,6 +34,7 @@ def make_teacher(email, role, full_name, department, staff_code, position):
 
 
 def seed_demo_data():
+    db.session.add(SystemSetting(id=1))
     admin = make_user("admin@sms.example.com", "admin")
     headmaster = make_teacher("headmaster@sms.example.com", "headmaster", "Dr. Hla Min", "Leadership", "HM-001", "headmaster")
     dean = make_teacher("dean@sms.example.com", "dean", "Daw Thiri Win", "Academic Affairs", "D-001", "dean")

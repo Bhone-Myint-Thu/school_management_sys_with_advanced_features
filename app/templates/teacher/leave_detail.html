@@ -16,12 +16,18 @@
 <section class="panel narrow">
   <div class="panel-title-row">
     <h2>Teacher Decision</h2>
+    {% if settings.teacher_leave_decisions_enabled %}
     <div class="actions">
       <form method="post" action="{{ url_for('teacher.leave_set_status', leave_id=leave_request.id, status='draft') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-outline-primary">Reset to Draft</button></form>
       <form method="post" action="{{ url_for('teacher.leave_set_status', leave_id=leave_request.id, status='approved') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-primary">Approve</button></form>
       <form method="post" action="{{ url_for('teacher.leave_set_status', leave_id=leave_request.id, status='refused') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-outline-danger">Refuse</button></form>
     </div>
+    {% endif %}
   </div>
-  <form method="post">{% include "partials/form.html" %}</form>
+  {% if settings.teacher_leave_decisions_enabled %}
+    <form method="post">{% include "partials/form.html" %}</form>
+  {% else %}
+    <div class="alert alert-warning">Teacher decisions are disabled in system settings.</div>
+  {% endif %}
 </section>
 {% endblock %}

@@ -4,19 +4,94 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}School Management System{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v='4') }}">
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("sms-theme") || "light";
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v='6') }}">
 </head>
 <body>
   {% if current_user.is_authenticated %}
   <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand">
-        <span class="brand-mark">SMS</span>
-        <div>
-          <strong>School Portal</strong>
-          <small>{{ current_user.role|title }}</small>
+    <header class="topbar">
+      <a class="top-brand" href="{{ url_for('main.index') }}">
+        <span class="brand-mark">E</span>
+        <span>{{ system_settings.school_name }}</span>
+      </a>
+      <form class="global-search" action="{{ url_for('main.search') }}" method="get">
+        <span>Search</span>
+        <input type="search" name="q" value="{{ request.args.get('q', '') }}" placeholder="Search student, teacher, class...">
+      </form>
+      <div class="top-actions">
+        <span class="status-dot" title="School session active"></span>
+        <button class="top-icon theme-toggle" type="button" data-theme-toggle aria-label="Switch to dark mode">
+          <span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span>
+          <span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span>
+        </button>
+        <div class="top-menu">
+          <button class="top-icon notification-button" type="button" data-menu-toggle="notifications" aria-label="Open notification list">
+            !
+            {% if unread_notification_count %}<span class="notification-count">{{ unread_notification_count }}</span>{% endif %}
+          </button>
+          <div class="top-dropdown notification-dropdown" data-menu-panel="notifications">
+            <div class="dropdown-head">
+              <strong>Notifications</strong>
+              <small>{{ unread_notification_count }} unread · {{ top_notifications|length }} recent</small>
+            </div>
+            {% if unread_notification_count %}
+              <form action="{{ url_for('main.mark_notifications_read') }}" method="post" class="mark-read-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-primary btn-block" type="submit">Mark all as read</button>
+              </form>
+            {% endif %}
+            <div class="notification-list">
+              {% for item in top_notifications %}
+                <article class="{% if item.unread %}unread{% endif %}">
+                  <strong>{{ item.title }}</strong>
+                  <span>{{ item.body }}</span>
+                  <small>{{ item.when }}</small>
+                </article>
+              {% else %}
+                <article><strong>No notifications</strong><span>You are all caught up.</span></article>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        <div class="top-menu">
+          <button class="avatar" type="button" data-menu-toggle="profile" aria-label="Open current user profile">{{ current_user.display_name[:1]|upper }}</button>
+          <div class="top-dropdown profile-dropdown" data-menu-panel="profile">
+            <div class="profile-summary">
+              <span class="profile-avatar-sm">{{ current_user.display_name[:1]|upper }}</span>
+              <div>
+                <strong>{{ current_user.display_name }}</strong>
+                <small>{{ current_user.role|title }} workspace</small>
+              </div>
+            </div>
+            <div class="detail-grid compact">
+              <div><span>Email</span><strong>{{ current_user.email }}</strong></div>
+              <div><span>Role</span><strong>{{ current_user.role|title }}</strong></div>
+              {% if current_user.teacher %}
+                <div><span>Department</span><strong>{{ current_user.teacher.department }}</strong></div>
+                <div><span>Staff Code</span><strong>{{ current_user.teacher.staff_code }}</strong></div>
+              {% elif current_user.parent %}
+                <div><span>Phone</span><strong>{{ current_user.parent.phone or "Not recorded" }}</strong></div>
+                <div><span>Children</span><strong>{{ current_user.parent.students|map(attribute="full_name")|join(", ") or "No children linked" }}</strong></div>
+              {% elif current_user.student %}
+                <div><span>Student Code</span><strong>{{ current_user.student.student_code }}</strong></div>
+                <div><span>Grade</span><strong>{{ current_user.student.year_group }}</strong></div>
+              {% else %}
+                <div><span>Access</span><strong>System administrator</strong></div>
+              {% endif %}
+            </div>
+            <form action="{{ url_for('auth.logout') }}" method="post" class="profile-actions">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-logout btn-block" type="submit">Logout</button>
+            </form>
+          </div>
         </div>
       </div>
+    </header>
+    <div class="app-body">
+    <aside class="sidebar">
       <nav class="side-nav">
         <a class="nav-link {% if request.endpoint.endswith('.dashboard') %}active{% endif %}" href="{{ url_for('main.index') }}"><span>▦</span>Dashboard</a>
         {% if current_user.role in ['admin', 'headmaster', 'dean'] %}
@@ -27,6 +102,7 @@
           <a class="nav-link {% if request.endpoint.startswith('admin.timetable') %}active{% endif %}" href="{{ url_for('admin.timetable') }}"><span>◴</span>Timetable</a>
           <a class="nav-link {% if request.endpoint.startswith('admin.leave') %}active{% endif %}" href="{{ url_for('admin.leave') }}"><span>✓</span>Leave</a>
           <a class="nav-link {% if request.endpoint.startswith('admin.notice') %}active{% endif %}" href="{{ url_for('admin.notices') }}"><span>!</span>Notices</a>
+          <a class="nav-link {% if request.endpoint == 'admin.settings' %}active{% endif %}" href="{{ url_for('admin.settings') }}"><span>⚙</span>Settings</a>
         {% elif current_user.role == 'teacher' %}
           <a class="nav-link {% if request.endpoint == 'teacher.students' %}active{% endif %}" href="{{ url_for('teacher.students') }}"><span>◉</span>Students</a>
           <div class="nav-group {% if request.endpoint.startswith('teacher.attendance') %}open{% endif %}">
@@ -59,23 +135,23 @@
           <a class="nav-link" href="{{ url_for('student.dashboard') }}"><span>◴</span>Timetable</a>
         {% endif %}
       </nav>
-      <form action="{{ url_for('auth.logout') }}" method="post" class="logout-form">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button class="btn btn-ghost btn-block" type="submit">Sign out</button>
-      </form>
+      <div class="school-status">
+        <small>School Status</small>
+        <strong>Active Session</strong>
+        <span>{{ system_settings.academic_session }}</span>
+      </div>
     </aside>
     <main class="main">
-      <header class="topbar">
-        <div>
-          <h1>{% block page_title %}Dashboard{% endblock %}</h1>
-          <span>{{ current_user.display_name }}</span>
-        </div>
-      </header>
       <section class="content">
+        <div class="page-heading">
+          <h1>{% block page_title %}Dashboard{% endblock %}</h1>
+          <p>{% block page_subtitle %}{{ current_user.display_name }} · {{ current_user.role|title }} workspace{% endblock %}</p>
+        </div>
         {% include "partials/flash.html" %}
         {% block content %}{% endblock %}
       </section>
     </main>
+    </div>
   </div>
   {% else %}
     <main class="auth-page">
@@ -84,7 +160,7 @@
     </main>
   {% endif %}
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/app.js', v='3') }}"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

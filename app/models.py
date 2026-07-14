@@ -237,6 +237,44 @@ class Notice(db.Model):
     approved_by = db.relationship("User", foreign_keys=[approved_by_id])
 
 
+class SystemSetting(db.Model):
+    __tablename__ = "system_settings"
+
+    id = db.Column(db.Integer, primary_key=True, default=1)
+    school_name = db.Column(db.String(120), default="EduManage Demonstration School", nullable=False)
+    academic_session = db.Column(db.String(30), default="2026-27", nullable=False)
+    timezone = db.Column(db.String(60), default="Asia/Yangon", nullable=False)
+    attendance_alert_threshold = db.Column(db.Float, default=85.0, nullable=False)
+    default_grade_start = db.Column(db.Integer, default=1, nullable=False)
+    default_grade_end = db.Column(db.Integer, default=12, nullable=False)
+    attendance_mode = db.Column(db.String(30), default="daily_class", nullable=False)
+    default_notice_audience = db.Column(db.String(20), default="all", nullable=False)
+    notice_approval_required = db.Column(db.Boolean, default=True, nullable=False)
+    teacher_leave_decisions_enabled = db.Column(db.Boolean, default=True, nullable=False)
+    parent_leave_requests_enabled = db.Column(db.Boolean, default=True, nullable=False)
+    portal_message = db.Column(db.Text, default="Welcome to the school portal.", nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    @classmethod
+    def ensure_table(cls):
+        cls.__table__.create(db.engine, checkfirst=True)
+
+    @classmethod
+    def current(cls):
+        cls.ensure_table()
+        settings = db.session.get(cls, 1)
+        if settings:
+            return settings
+        settings = cls(id=1)
+        db.session.add(settings)
+        db.session.commit()
+        return settings
+
+    @classmethod
+    def defaults(cls):
+        return cls(id=1)
+
+
 def letter_for_mark(mark, max_mark=100):
     pct = 0 if max_mark == 0 else (mark / max_mark) * 100
     if pct >= 70:
