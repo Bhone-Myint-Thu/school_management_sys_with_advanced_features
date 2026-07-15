@@ -12,9 +12,18 @@
   <a class="btn btn-primary" href="{{ url_for('admin.class_create') }}">Add Class</a>
 </div>
 <section class="panel">
-  <table class="table">
-    <thead><tr><th>Class</th><th>Grade</th><th>Teacher</th><th>Room</th><th>Students</th><th></th></tr></thead>
-    <tbody>{% for class in classes %}<tr><td><a class="table-link" href="{{ url_for('admin.class_detail', class_id=class.id) }}">{{ class.name }}</a></td><td>{{ class.year_group }} {{ class.section }}</td><td>{{ class.teacher.full_name }}</td><td>{{ class.room }}</td><td>{{ class.students|length }}</td><td class="actions"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.class_edit', class_id=class.id) }}">Edit</a></td></tr>{% endfor %}</tbody>
-  </table>
+  {% for grade in grouped_classes %}
+    <div class="group-section">
+      <h2>{{ grade.grade }}</h2>
+      <section class="nested-panel">
+        <table class="table">
+          <thead><tr><th>Class</th><th>Section</th><th>Teacher</th><th>Room</th><th>Students</th><th></th></tr></thead>
+          <tbody>{% for class in grade.classes %}<tr><td><a class="table-link" href="{{ url_for('admin.class_detail', class_id=class.id) }}">{{ class.name }}</a></td><td>{{ class.section }}</td><td>{{ class.teacher.full_name }}</td><td>{{ class.room }}</td><td>{{ class.students|length }}</td><td class="actions"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.class_edit', class_id=class.id) }}">Edit</a></td></tr>{% endfor %}</tbody>
+        </table>
+      </section>
+    </div>
+  {% else %}
+    <div class="alert alert-info">No classes match the selected grade.</div>
+  {% endfor %}
 </section>
 {% endblock %}

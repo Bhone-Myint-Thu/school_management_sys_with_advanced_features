@@ -8,6 +8,8 @@
   <a class="{% if active_tab == 'change-password' %}active{% endif %}" href="{{ url_for('admin.settings', tab='change-password') }}">Change Password</a>
   <a class="{% if active_tab == 'connect-account' %}active{% endif %}" href="{{ url_for('admin.settings', tab='connect-account') }}">Connect Account</a>
   <a class="{% if active_tab == 'account-directory' %}active{% endif %}" href="{{ url_for('admin.settings', tab='account-directory') }}">Account Directory</a>
+  <a class="{% if active_tab == 'grades' %}active{% endif %}" href="{{ url_for('admin.settings', tab='grades') }}">Grades</a>
+  <a class="{% if active_tab == 'departments' %}active{% endif %}" href="{{ url_for('admin.settings', tab='departments') }}">Departments</a>
 </div>
 
 {% if active_tab == 'system' %}
@@ -227,5 +229,78 @@
       </tbody>
     </table>
   </section>
+
+{% elif active_tab == 'grades' %}
+  <div class="grid-2">
+    <section class="panel narrow">
+      <div class="panel-title-row">
+        <div>
+          <h2>Create Grade</h2>
+          <p class="subtle">Create a managed grade. The code is generated automatically from the grade number.</p>
+        </div>
+      </div>
+      <form method="post" action="{{ url_for('admin.setting_grade_create') }}">
+        {{ grade_form.hidden_tag() }}
+        <div class="form-field">
+          {{ grade_form.sequence.label(class="form-label") }}
+          {{ grade_form.sequence(class="form-control", placeholder="13") }}
+        </div>
+        {{ grade_form.submit(class="btn btn-primary") }}
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-title-row">
+        <h2>Grade Directory</h2>
+        <span class="badge status-approved">{{ grade_levels|length }} grades</span>
+      </div>
+      <table class="table">
+        <thead><tr><th>Grade</th><th>Auto Code</th><th>Sequence</th></tr></thead>
+        <tbody>
+        {% for grade in grade_levels %}
+          <tr><td>{{ grade.name }}</td><td><span class="badge status-draft">{{ grade.code }}</span></td><td>{{ grade.sequence }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  </div>
+{% elif active_tab == 'departments' %}
+  <div class="grid-2">
+    <section class="panel narrow">
+      <div class="panel-title-row">
+        <div>
+          <h2>Create Department</h2>
+          <p class="subtle">Departments are used when creating and filtering teacher profiles.</p>
+        </div>
+      </div>
+      <form method="post" action="{{ url_for('admin.setting_department_create') }}">
+        {{ department_form.hidden_tag() }}
+        <div class="form-field">
+          {{ department_form.name.label(class="form-label") }}
+          {{ department_form.name(class="form-control", placeholder="Computer Science") }}
+        </div>
+        <div class="form-field">
+          {{ department_form.code.label(class="form-label") }}
+          {{ department_form.code(class="form-control", placeholder="CS") }}
+        </div>
+        {{ department_form.submit(class="btn btn-primary") }}
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-title-row">
+        <h2>Department Directory</h2>
+        <span class="badge status-approved">{{ departments|length }} departments</span>
+      </div>
+      <table class="table">
+        <thead><tr><th>Department</th><th>Code</th></tr></thead>
+        <tbody>
+        {% for department in departments %}
+          <tr><td>{{ department.name }}</td><td><span class="badge status-draft">{{ department.code }}</span></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  </div>
 {% endif %}
 {% endblock %}

@@ -1,0 +1,22 @@
+<div class="calendar-grid timetable-calendar">
+  {% for day in days %}
+    <article class="calendar-day">
+      <div class="calendar-day-head">
+        <strong>{{ day }}</strong>
+        <span>{{ student.full_name }}</span>
+      </div>
+      <div class="calendar-records">
+        {% set day_slots = timetable|selectattr("day_of_week", "equalto", day)|list %}
+        {% for slot in day_slots %}
+          <div>
+            <span>{{ slot.start_time.strftime("%H:%M") }} - {{ slot.end_time.strftime("%H:%M") }}</span>
+            <strong>{{ slot.school_class.subject }}</strong>
+            <small>{{ slot.period }} · {{ slot.school_class.teacher.full_name }} · {{ slot.school_class.room }}</small>
+          </div>
+        {% else %}
+          <div class="empty-slot">No classes</div>
+        {% endfor %}
+      </div>
+    </article>
+  {% endfor %}
+</div>

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block page_title %}Assignments{% endblock %}
+{% block page_subtitle %}Upload and re-upload work before the deadline{% endblock %}
+{% block content %}
+<section class="panel">
+  <table class="table">
+    <thead><tr><th>Title</th><th>Subject</th><th>Deadline</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for row in assignments %}
+      {% set submission = submissions.get(row.id) %}
+      <tr>
+        <td>{{ row.title }}</td>
+        <td>{{ row.school_class.subject }}</td>
+        <td>{{ row.due_date }}</td>
+        <td>
+          {% if submission %}
+            <span class="badge status-approved">Uploaded</span>
+            <small>{{ submission.submitted_at.strftime("%Y-%m-%d %H:%M") }}</small>
+          {% elif row.due_date < today %}
+            <span class="badge status-refused">Closed</span>
+          {% else %}
+            <span class="badge status-draft">Open</span>
+          {% endif %}
+        </td>
+        <td class="actions">
+          {% if row.due_date >= today %}
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('student.assignment_upload', assignment_id=row.id) }}">{{ "Re-upload" if submission else "Upload" }}</a>
+          {% else %}
+            <span class="text-muted">Deadline passed</span>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

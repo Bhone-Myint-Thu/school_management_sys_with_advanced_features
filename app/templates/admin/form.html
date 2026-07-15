@@ -3,7 +3,7 @@
 {% block content %}
 <section class="panel narrow">
   <h2>{{ title }}</h2>
-  <form method="post">
+  <form method="post" {% if dependent_url is defined %}data-dependent-url="{{ dependent_url }}" data-dependent-source="{{ dependent_source }}" data-dependent-target="{{ dependent_target }}"{% endif %}>
     {% include "partials/form.html" %}
   </form>
 </section>

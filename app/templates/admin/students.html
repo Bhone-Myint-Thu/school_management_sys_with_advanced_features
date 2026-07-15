@@ -17,27 +17,35 @@
   <a class="btn btn-primary" href="{{ url_for('admin.student_create') }}">Add Student</a>
 </div>
 <section class="panel">
-  <table class="table">
-    <thead><tr><th>Name</th><th>Code</th><th>Grade</th><th>Classes</th><th>Parents</th><th>Attendance</th><th></th></tr></thead>
-    <tbody>
-    {% for student in students %}
-      <tr>
-        <td><a class="table-link" href="{{ url_for('admin.student_detail', student_id=student.id) }}">{{ student.full_name }}</a><small>{{ student.user.email }}</small></td>
-        <td>{{ student.student_code }}</td>
-        <td>{{ student.year_group }}</td>
-        <td>{{ student.classes|map(attribute="name")|join(", ") or "Not enrolled" }}</td>
-        <td>{{ student.parents|map(attribute="full_name")|join(", ") or "Not linked" }}</td>
-        <td>{{ student.attendance_percentage }}%</td>
-        <td class="actions">
-          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.student_edit', student_id=student.id) }}">Edit</a>
-          <form method="post" action="{{ url_for('admin.student_delete', student_id=student.id) }}" onsubmit="return confirm('Delete this student?')">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button class="btn btn-sm btn-outline-danger">Delete</button>
-          </form>
-        </td>
-      </tr>
+  {% for grade in grouped_students %}
+    <div class="group-section">
+      <h2>{{ grade.grade }}</h2>
+      <section class="nested-panel">
+        <table class="table">
+          <thead><tr><th>Name</th><th>Code</th><th>Classes</th><th>Parents</th><th>Attendance</th><th></th></tr></thead>
+          <tbody>
+          {% for student in grade.students %}
+            <tr>
+              <td><a class="table-link" href="{{ url_for('admin.student_detail', student_id=student.id) }}">{{ student.full_name }}</a><small>{{ student.user.email }}</small></td>
+              <td>{{ student.student_code }}</td>
+              <td>{{ student.classes|map(attribute="name")|join(", ") or "Not enrolled" }}</td>
+              <td>{{ student.parents|map(attribute="full_name")|join(", ") or "Not linked" }}</td>
+              <td>{{ student.attendance_percentage }}%</td>
+              <td class="actions">
+                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.student_edit', student_id=student.id) }}">Edit</a>
+                <form method="post" action="{{ url_for('admin.student_delete', student_id=student.id) }}" onsubmit="return confirm('Delete this student?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    </div>
+  {% else %}
+    <div class="alert alert-info">No students match the selected filters.</div>
     {% endfor %}
-    </tbody>
-  </table>
 </section>
 {% endblock %}

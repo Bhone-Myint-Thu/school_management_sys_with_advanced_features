@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import func, or_
 
@@ -8,6 +8,8 @@ from ..access import MANAGEMENT_ROLES, visible_classes_query
 from ..extensions import db
 from ..forms import (
     ClassForm,
+    DepartmentForm,
+    GradeLevelForm,
     LeaveDecisionForm,
     NoticeForm,
     ParentForm,
@@ -19,7 +21,7 @@ from ..forms import (
     UserAccountForm,
     UserPasswordForm,
 )
-from ..models import Attendance, LeaveRequest, Notice, Parent, SchoolClass, Student, SystemSetting, Teacher, Timetable, User
+from ..models import Attendance, Department, GradeLevel, LeaveRequest, Notice, Parent, SchoolClass, Student, SystemSetting, Teacher, Timetable, User, teacher_grade
 from ..security import roles_required
 
 bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -46,6 +48,14 @@ def _class_choices(include_all=False):
 
 def _student_choices():
     return [(student.id, f"{student.full_name} ({student.student_code})") for student in Student.query.order_by(Student.full_name)]
+
+
+def _student_choices_for_grade(year_group):
+    if not year_group:
+        return []
+    query = Student.query
+    query = query.filter(Student.year_group == year_group)
+    return [(student.id, f"{student.full_name} ({student.student_code})") for student in query.order_by(Student.full_name)]
 
 
 def _apply_student_filters(query):
@@ -109,7 +119,139 @@ def _apply_class_filters(query):
 
 
 def _grade_choices():
-    return [f"Grade {i}" for i in range(1, 13)]
+    return [label for _, label in GradeLevel.choices()]
+
+
+def _grade_level_choices():
+    GradeLevel.ensure_defaults()
+    return [(row.id, row.name) for row in GradeLevel.query.order_by(GradeLevel.sequence)]
+
+
+def _apply_grade_choices(form):
+    form.year_group.choices = GradeLevel.choices()
+    return form
+
+
+def _apply_teacher_choices(form):
+    Department.ensure_defaults()
+    form.department.choices = Department.choices()
+    form.grade_ids.choices = _grade_level_choices()
+    return form
+
+
+def _ensure_reference_tables():
+    GradeLevel.ensure_defaults()
+    Department.ensure_defaults()
+    teacher_grade.create(db.engine, checkfirst=True)
+
+
+def _group_classes_by_grade(classes):
+    grouped = []
+    grade_map = {}
+    for school_class in classes:
+        bucket = grade_map.get(school_class.year_group)
+        if bucket is None:
+            bucket = {"grade": school_class.year_group, "classes": []}
+            grade_map[school_class.year_group] = bucket
+            grouped.append(bucket)
+        bucket["classes"].append(school_class)
+    return grouped
+
+
+def _group_students_by_grade(students):
+    grouped = []
+    grade_map = {}
+    for student in students:
+        bucket = grade_map.get(student.year_group)
+        if bucket is None:
+            bucket = {"grade": student.year_group, "students": []}
+            grade_map[student.year_group] = bucket
+            grouped.append(bucket)
+        bucket["students"].append(student)
+    return grouped
+
+
+def _selected_students_match_grade(student_ids, year_group):
+    if not student_ids:
+        return True
+    mismatched = Student.query.filter(Student.id.in_(student_ids), Student.year_group != year_group).first()
+    return mismatched is None
+
+
+def _selected_classes_match_grade(class_ids, year_group):
+    if not class_ids:
+        return True
+    mismatched = SchoolClass.query.filter(SchoolClass.id.in_(class_ids), SchoolClass.year_group != year_group).first()
+    return mismatched is None
+
+
+def _class_choices_for_grade(year_group):
+    if not year_group:
+        return []
+    return [
+        (row.id, f"{row.year_group} {row.section} - {row.subject}")
+        for row in SchoolClass.query.filter_by(year_group=year_group).order_by(SchoolClass.section, SchoolClass.subject)
+    ]
+
+
+def _class_options_by_grade():
+    options = {}
+    for school_class in SchoolClass.query.order_by(SchoolClass.year_group, SchoolClass.section, SchoolClass.subject):
+        options.setdefault(school_class.year_group, []).append(
+            {"value": school_class.id, "label": f"{school_class.year_group} {school_class.section} - {school_class.subject}"}
+        )
+    return options
+
+
+def _student_options_by_grade():
+    options = {}
+    for student in Student.query.order_by(Student.year_group, Student.full_name):
+        options.setdefault(student.year_group, []).append({"value": student.id, "label": f"{student.full_name} ({student.student_code})"})
+    return options
+
+
+@bp.route("/options/<kind>")
+@login_required
+@roles_required("admin", "headmaster", "dean")
+def dependent_options(kind):
+    year_group = request.args.get("year_group", "").strip()
+    if kind == "classes":
+        rows = [
+            {"value": row.id, "label": f"{row.year_group} {row.section} - {row.subject}"}
+            for row in SchoolClass.query.filter_by(year_group=year_group).order_by(SchoolClass.section, SchoolClass.subject)
+        ]
+    elif kind == "students":
+        rows = [
+            {"value": row.id, "label": f"{row.full_name} ({row.student_code})"}
+            for row in Student.query.filter_by(year_group=year_group).order_by(Student.full_name)
+        ]
+    else:
+        return ("Not found", 404)
+    return jsonify(rows)
+
+
+def _next_student_code(year_group):
+    grade = GradeLevel.query.filter_by(name=year_group).first()
+    prefix = grade.code if grade else year_group.replace(" ", "").upper()
+    existing = Student.query.filter(Student.student_code.like(f"{prefix}%")).with_entities(Student.student_code).all()
+    max_number = 0
+    for (code,) in existing:
+        suffix = code[-3:]
+        if suffix.isdigit():
+            max_number = max(max_number, int(suffix))
+    return f"{prefix}{max_number + 1:03d}"
+
+
+def _next_staff_code(grade_ids):
+    grade = GradeLevel.query.filter(GradeLevel.id.in_(grade_ids)).order_by(GradeLevel.sequence).first()
+    prefix = f"{grade.code}T" if grade else "T"
+    existing = Teacher.query.filter(Teacher.staff_code.like(f"{prefix}%")).with_entities(Teacher.staff_code).all()
+    max_number = 0
+    for (code,) in existing:
+        suffix = code[-3:]
+        if suffix.isdigit():
+            max_number = max(max_number, int(suffix))
+    return f"{prefix}{max_number + 1:03d}"
 
 
 def _user_choices():
@@ -209,10 +351,13 @@ def dashboard():
 @login_required
 @roles_required("admin", "headmaster", "dean")
 def settings():
+    _ensure_reference_tables()
     settings = SystemSetting.current()
     active_tab = request.args.get("tab", "system")
     form = SystemSettingsForm(obj=settings)
     account_form, password_form, link_form = _prepare_account_forms()
+    grade_form = GradeLevelForm(prefix="grade")
+    department_form = DepartmentForm(prefix="department")
     if form.validate_on_submit():
         if form.default_grade_start.data > form.default_grade_end.data:
             form.default_grade_end.errors.append("Ending grade must be greater than or equal to starting grade.")
@@ -229,8 +374,53 @@ def settings():
         account_form=account_form,
         password_form=password_form,
         link_form=link_form,
+        grade_form=grade_form,
+        department_form=department_form,
+        grade_levels=GradeLevel.query.order_by(GradeLevel.sequence).all(),
+        departments=Department.query.order_by(Department.name).all(),
         users=User.query.order_by(User.email).all(),
     )
+
+
+@bp.route("/settings/grades/create", methods=["POST"])
+@login_required
+@roles_required("admin", "headmaster", "dean")
+def setting_grade_create():
+    _ensure_reference_tables()
+    form = GradeLevelForm(prefix="grade")
+    if form.validate_on_submit():
+        number = form.sequence.data
+        name = f"Grade {number}"
+        code = f"G{number:02d}"
+        if GradeLevel.query.filter((GradeLevel.sequence == number) | (GradeLevel.name == name) | (GradeLevel.code == code)).first():
+            flash("That grade already exists.", "warning")
+        else:
+            db.session.add(GradeLevel(name=name, code=code, sequence=number))
+            db.session.commit()
+            flash(f"{name} created with code {code}.", "success")
+    else:
+        flash("Please enter a valid grade number.", "danger")
+    return redirect(url_for("admin.settings", tab="grades"))
+
+
+@bp.route("/settings/departments/create", methods=["POST"])
+@login_required
+@roles_required("admin", "headmaster", "dean")
+def setting_department_create():
+    _ensure_reference_tables()
+    form = DepartmentForm(prefix="department")
+    if form.validate_on_submit():
+        name = form.name.data.strip()
+        code = (form.code.data or "".join(part[:1] for part in name.split()) or name[:4]).upper()[:10]
+        if Department.query.filter((Department.name == name) | (Department.code == code)).first():
+            flash("That department already exists.", "warning")
+        else:
+            db.session.add(Department(name=name, code=code))
+            db.session.commit()
+            flash(f"{name} department created.", "success")
+    else:
+        flash("Please check the department form.", "danger")
+    return redirect(url_for("admin.settings", tab="departments"))
 
 
 @bp.route("/settings/users/create", methods=["POST"])
@@ -299,10 +489,13 @@ def setting_user_link():
 @login_required
 @roles_required("admin", "headmaster", "dean")
 def students():
+    _ensure_reference_tables()
     rows, search, year_group, class_id = _apply_student_filters(Student.query)
+    student_rows = rows.order_by(Student.year_group, Student.full_name).all()
     return render_template(
         "admin/students.html",
-        students=rows.order_by(Student.full_name).all(),
+        students=student_rows,
+        grouped_students=_group_students_by_grade(student_rows),
         search=search,
         grade_choices=_grade_choices(),
         classes=SchoolClass.query.order_by(SchoolClass.year_group, SchoolClass.name).all(),
@@ -323,6 +516,7 @@ def student_detail(student_id):
 @login_required
 @roles_required("admin", "headmaster", "dean")
 def teachers():
+    _ensure_reference_tables()
     rows, search, department, position = _apply_teacher_filters(Teacher.query)
     return render_template(
         "admin/teachers.html",
@@ -364,7 +558,14 @@ def parent_detail(parent_id):
 @roles_required("admin", "headmaster", "dean")
 def classes():
     rows, year_group = _apply_class_filters(SchoolClass.query)
-    return render_template("admin/classes.html", classes=rows.order_by(SchoolClass.year_group, SchoolClass.name).all(), grade_choices=_grade_choices(), selected_year_group=year_group)
+    class_rows = rows.order_by(SchoolClass.year_group, SchoolClass.name).all()
+    return render_template(
+        "admin/classes.html",
+        classes=class_rows,
+        grouped_classes=_group_classes_by_grade(class_rows),
+        grade_choices=_grade_choices(),
+        selected_year_group=year_group,
+    )
 
 
 @bp.route("/classes/<int:class_id>")
@@ -380,7 +581,14 @@ def class_detail(class_id):
 @roles_required("admin", "headmaster", "dean")
 def timetable():
     rows, year_group = _apply_class_filters(SchoolClass.query)
-    return render_template("admin/timetable.html", classes=rows.order_by(SchoolClass.year_group, SchoolClass.name).all(), grade_choices=_grade_choices(), selected_year_group=year_group)
+    class_rows = rows.order_by(SchoolClass.year_group, SchoolClass.name).all()
+    return render_template(
+        "admin/timetable.html",
+        classes=class_rows,
+        grouped_classes=_group_classes_by_grade(class_rows),
+        grade_choices=_grade_choices(),
+        selected_year_group=year_group,
+    )
 
 
 @bp.route("/timetable/<int:class_id>")
@@ -521,17 +729,25 @@ def parent_delete(parent_id):
 @login_required
 @roles_required("admin", "headmaster", "dean")
 def student_create():
-    form = StudentForm()
+    _ensure_reference_tables()
+    selected_year_group = request.args.get("year_group", "").strip()
+    form = _apply_grade_choices(StudentForm())
     form.parent_ids.choices = _parent_choices()
-    form.class_ids.choices = _class_choices()
+    if selected_year_group and request.method == "GET":
+        form.year_group.data = selected_year_group
+    class_grade = form.year_group.data if request.method == "POST" else selected_year_group
+    form.class_ids.choices = _class_choices_for_grade(class_grade)
     if form.validate_on_submit():
+        if not _selected_classes_match_grade(form.class_ids.data, form.year_group.data):
+            flash("Only classes from the selected grade can be added to this student.", "danger")
+            return render_template("admin/form.html", form=form, title="Add Student", dependent_url=url_for("admin.dependent_options", kind="classes"), dependent_source="year_group", dependent_target="class_ids")
         user = _save_user(User(), form.email.data, "student", form.password.data or "Password123")
         student = Student(
             user=user,
             full_name=form.full_name.data,
             year_group=form.year_group.data,
             date_of_birth=form.date_of_birth.data,
-            student_code=form.student_code.data,
+            student_code=_next_student_code(form.year_group.data),
             address=form.address.data,
             emergency_contact_name=form.emergency_contact_name.data,
             emergency_contact_phone=form.emergency_contact_phone.data,
@@ -544,27 +760,35 @@ def student_create():
         db.session.commit()
         flash("Student saved.", "success")
         return redirect(url_for("admin.students"))
-    return render_template("admin/form.html", form=form, title="Add Student")
+    return render_template("admin/form.html", form=form, title="Add Student", dependent_url=url_for("admin.dependent_options", kind="classes"), dependent_source="year_group", dependent_target="class_ids")
 
 
 @bp.route("/students/<int:student_id>/edit", methods=["GET", "POST"])
 @login_required
 @roles_required("admin", "headmaster", "dean")
 def student_edit(student_id):
+    _ensure_reference_tables()
     student = db.get_or_404(Student, student_id)
-    form = StudentForm(obj=student)
+    selected_year_group = request.args.get("year_group", student.year_group).strip()
+    form = _apply_grade_choices(StudentForm(obj=student))
     form.parent_ids.choices = _parent_choices()
-    form.class_ids.choices = _class_choices()
+    class_grade = form.year_group.data if request.method == "POST" else selected_year_group
+    form.class_ids.choices = _class_choices_for_grade(class_grade)
     if request.method == "GET":
         form.email.data = student.user.email
+        form.year_group.data = selected_year_group
         form.parent_ids.data = student.parents[0].id if student.parents else 0
         form.class_ids.data = [school_class.id for school_class in student.classes]
     if form.validate_on_submit():
+        if not _selected_classes_match_grade(form.class_ids.data, form.year_group.data):
+            flash("Only classes from the selected grade can be added to this student.", "danger")
+            return render_template("admin/form.html", form=form, title="Edit Student", dependent_url=url_for("admin.dependent_options", kind="classes"), dependent_source="year_group", dependent_target="class_ids")
         _save_user(student.user, form.email.data, "student", form.password.data)
         student.full_name = form.full_name.data
+        if student.year_group != form.year_group.data:
+            student.student_code = _next_student_code(form.year_group.data)
         student.year_group = form.year_group.data
         student.date_of_birth = form.date_of_birth.data
-        student.student_code = form.student_code.data
         student.address = form.address.data
         student.emergency_contact_name = form.emergency_contact_name.data
         student.emergency_contact_phone = form.emergency_contact_phone.data
@@ -576,7 +800,7 @@ def student_edit(student_id):
         db.session.commit()
         flash("Student updated.", "success")
         return redirect(url_for("admin.student_detail", student_id=student.id))
-    return render_template("admin/form.html", form=form, title="Edit Student")
+    return render_template("admin/form.html", form=form, title="Edit Student", dependent_url=url_for("admin.dependent_options", kind="classes"), dependent_source="year_group", dependent_target="class_ids")
 
 
 @bp.route("/students/<int:student_id>/delete", methods=["POST"])
@@ -594,16 +818,18 @@ def student_delete(student_id):
 @login_required
 @roles_required("admin", "headmaster", "dean")
 def teacher_create():
-    form = TeacherForm()
+    _ensure_reference_tables()
+    form = _apply_teacher_choices(TeacherForm())
     if form.validate_on_submit():
         user = _save_user(User(), form.email.data, form.position.data, form.password.data or "Password123")
         teacher = Teacher(
             user=user,
             full_name=form.full_name.data,
             department=form.department.data,
-            staff_code=form.staff_code.data,
+            staff_code=_next_staff_code(form.grade_ids.data),
             position=form.position.data,
         )
+        teacher.grade_levels = [db.session.get(GradeLevel, grade_id) for grade_id in form.grade_ids.data]
         db.session.add(teacher)
         db.session.commit()
         flash("Teacher saved.", "success")
@@ -615,17 +841,19 @@ def teacher_create():
 @login_required
 @roles_required("admin", "headmaster", "dean")
 def teacher_edit(teacher_id):
+    _ensure_reference_tables()
     teacher = db.get_or_404(Teacher, teacher_id)
-    form = TeacherForm(obj=teacher)
+    form = _apply_teacher_choices(TeacherForm(obj=teacher))
     if request.method == "GET":
         form.email.data = teacher.user.email
+        form.grade_ids.data = [grade.id for grade in teacher.grade_levels]
     if form.validate_on_submit():
         _save_user(teacher.user, form.email.data, "teacher", form.password.data)
         teacher.user.role = form.position.data
         teacher.full_name = form.full_name.data
         teacher.department = form.department.data
-        teacher.staff_code = form.staff_code.data
         teacher.position = form.position.data
+        teacher.grade_levels = [db.session.get(GradeLevel, grade_id) for grade_id in form.grade_ids.data]
         db.session.commit()
         flash("Teacher updated.", "success")
         return redirect(url_for("admin.teachers"))
@@ -647,10 +875,17 @@ def teacher_delete(teacher_id):
 @login_required
 @roles_required("admin", "headmaster", "dean")
 def class_create():
-    form = ClassForm()
+    selected_year_group = request.args.get("year_group", "").strip()
+    form = _apply_grade_choices(ClassForm())
     form.teacher_id.choices = [(teacher.id, teacher.full_name) for teacher in Teacher.query.order_by(Teacher.full_name)]
-    form.student_ids.choices = _student_choices()
+    if selected_year_group and request.method == "GET":
+        form.year_group.data = selected_year_group
+    student_grade = form.year_group.data if request.method == "POST" else selected_year_group
+    form.student_ids.choices = _student_choices_for_grade(student_grade)
     if form.validate_on_submit():
+        if not _selected_students_match_grade(form.student_ids.data, form.year_group.data):
+            flash("Only students from the selected grade can be added to this class.", "danger")
+            return render_template("admin/form.html", form=form, title="Add Class", dependent_url=url_for("admin.dependent_options", kind="students"), dependent_source="year_group", dependent_target="student_ids")
         school_class = SchoolClass(
             teacher_id=form.teacher_id.data,
             name=form.name.data,
@@ -664,7 +899,7 @@ def class_create():
         db.session.commit()
         flash("Class saved.", "success")
         return redirect(url_for("admin.classes"))
-    return render_template("admin/form.html", form=form, title="Add Class")
+    return render_template("admin/form.html", form=form, title="Add Class", dependent_url=url_for("admin.dependent_options", kind="students"), dependent_source="year_group", dependent_target="student_ids")
 
 
 @bp.route("/classes/<int:class_id>/edit", methods=["GET", "POST"])
@@ -672,13 +907,19 @@ def class_create():
 @roles_required("admin", "headmaster", "dean")
 def class_edit(class_id):
     school_class = db.get_or_404(SchoolClass, class_id)
-    form = ClassForm(obj=school_class)
+    selected_year_group = request.args.get("year_group", school_class.year_group).strip()
+    form = _apply_grade_choices(ClassForm(obj=school_class))
     form.teacher_id.choices = [(teacher.id, teacher.full_name) for teacher in Teacher.query.order_by(Teacher.full_name)]
-    form.student_ids.choices = _student_choices()
+    student_grade = form.year_group.data if request.method == "POST" else selected_year_group
+    form.student_ids.choices = _student_choices_for_grade(student_grade)
     if request.method == "GET":
         form.teacher_id.data = school_class.teacher_id
+        form.year_group.data = selected_year_group
         form.student_ids.data = [student.id for student in school_class.students]
     if form.validate_on_submit():
+        if not _selected_students_match_grade(form.student_ids.data, form.year_group.data):
+            flash("Only students from the selected grade can be added to this class.", "danger")
+            return render_template("admin/form.html", form=form, title="Edit Class", dependent_url=url_for("admin.dependent_options", kind="students"), dependent_source="year_group", dependent_target="student_ids")
         school_class.teacher_id = form.teacher_id.data
         school_class.name = form.name.data
         school_class.subject = form.subject.data
@@ -689,7 +930,7 @@ def class_edit(class_id):
         db.session.commit()
         flash("Class updated.", "success")
         return redirect(url_for("admin.class_detail", class_id=school_class.id))
-    return render_template("admin/form.html", form=form, title="Edit Class")
+    return render_template("admin/form.html", form=form, title="Edit Class", dependent_url=url_for("admin.dependent_options", kind="students"), dependent_source="year_group", dependent_target="student_ids")
 
 
 @bp.route("/classes/<int:class_id>/delete", methods=["POST"])
@@ -708,8 +949,35 @@ def class_delete(class_id):
 @roles_required("admin", "headmaster", "dean")
 def timetable_create():
     form = TimetableForm()
-    form.class_id.choices = [(row.id, row.name) for row in SchoolClass.query.order_by(SchoolClass.name)]
+    form.class_id.choices = [(row.id, f"{row.year_group} - {row.name}") for row in SchoolClass.query.order_by(SchoolClass.year_group, SchoolClass.name)]
     if form.validate_on_submit():
+        if form.start_time.data >= form.end_time.data:
+            flash("End time must be after start time.", "danger")
+            return render_template("admin/form.html", form=form, title="Add Timetable Slot")
+        selected_class = db.session.get(SchoolClass, form.class_id.data)
+        conflict = Timetable.query.filter(
+            Timetable.class_id == form.class_id.data,
+            Timetable.day_of_week == form.day_of_week.data,
+            Timetable.start_time < form.end_time.data,
+            Timetable.end_time > form.start_time.data,
+        ).first()
+        if conflict:
+            flash("This class already has a timetable slot at that time.", "danger")
+            return render_template("admin/form.html", form=form, title="Add Timetable Slot")
+        teacher_conflict = (
+            Timetable.query.join(SchoolClass)
+            .filter(
+                SchoolClass.teacher_id == selected_class.teacher_id,
+                Timetable.class_id != form.class_id.data,
+                Timetable.day_of_week == form.day_of_week.data,
+                Timetable.start_time < form.end_time.data,
+                Timetable.end_time > form.start_time.data,
+            )
+            .first()
+        )
+        if teacher_conflict:
+            flash("This teacher already has a timetable slot at that time.", "danger")
+            return render_template("admin/form.html", form=form, title="Add Timetable Slot")
         slot = Timetable(
             class_id=form.class_id.data,
             day_of_week=form.day_of_week.data,

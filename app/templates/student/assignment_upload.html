@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block page_title %}Upload Assignment{% endblock %}
+{% block page_subtitle %}{{ assignment.title }} · {{ assignment.school_class.subject }}{% endblock %}
+{% block content %}
+<section class="panel narrow">
+  <div class="panel-title-row">
+    <div>
+      <h2>{{ assignment.title }}</h2>
+      <p class="subtle">Deadline {{ assignment.due_date }} · {{ assignment.school_class.name }}</p>
+    </div>
+  </div>
+  {% if submission %}
+    <div class="alert alert-info">Current upload: {{ submission.original_filename }}. Uploading again will replace it.</div>
+  {% endif %}
+  <form method="post" enctype="multipart/form-data">{% include "partials/form.html" %}</form>
+</section>
+{% endblock %}

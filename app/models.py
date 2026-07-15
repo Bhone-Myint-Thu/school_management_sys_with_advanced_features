@@ -18,6 +18,12 @@ class_student = db.Table(
     db.Column("student_id", db.Integer, db.ForeignKey("students.id"), primary_key=True),
 )
 
+teacher_grade = db.Table(
+    "teacher_grade",
+    db.Column("teacher_id", db.Integer, db.ForeignKey("teachers.id"), primary_key=True),
+    db.Column("grade_id", db.Integer, db.ForeignKey("grade_levels.id"), primary_key=True),
+)
+
 
 class User(UserMixin, db.Model):
     __tablename__ = "users"
@@ -108,6 +114,7 @@ class Teacher(db.Model):
 
     user = db.relationship("User", back_populates="teacher")
     classes = db.relationship("SchoolClass", back_populates="teacher")
+    grade_levels = db.relationship("GradeLevel", secondary=teacher_grade, back_populates="teachers")
 
 
 class SchoolClass(db.Model):
@@ -126,6 +133,70 @@ class SchoolClass(db.Model):
     attendance = db.relationship("Attendance", back_populates="school_class", cascade="all, delete-orphan")
     timetable = db.relationship("Timetable", back_populates="school_class", cascade="all, delete-orphan")
     assignments = db.relationship("Assignment", back_populates="school_class", cascade="all, delete-orphan")
+
+
+class GradeLevel(db.Model):
+    __tablename__ = "grade_levels"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(20), unique=True, nullable=False)
+    code = db.Column(db.String(10), unique=True, nullable=False)
+    sequence = db.Column(db.Integer, unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    teachers = db.relationship("Teacher", secondary=teacher_grade, back_populates="grade_levels")
+
+    @classmethod
+    def ensure_table(cls):
+        cls.__table__.create(db.engine, checkfirst=True)
+
+    @classmethod
+    def ensure_defaults(cls):
+        cls.ensure_table()
+        if cls.query.count():
+            return
+        for number in range(1, 13):
+            db.session.add(cls(name=f"Grade {number}", code=f"G{number:02d}", sequence=number))
+        db.session.commit()
+
+    @classmethod
+    def choices(cls):
+        cls.ensure_defaults()
+        return [(row.name, row.name) for row in cls.query.order_by(cls.sequence)]
+
+
+class Department(db.Model):
+    __tablename__ = "departments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), unique=True, nullable=False)
+    code = db.Column(db.String(10), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    @classmethod
+    def ensure_table(cls):
+        cls.__table__.create(db.engine, checkfirst=True)
+
+    @classmethod
+    def ensure_defaults(cls):
+        cls.ensure_table()
+        if cls.query.count():
+            return
+        defaults = [
+            ("Leadership", "LEAD"),
+            ("Academic Affairs", "ACAD"),
+            ("Science", "SCI"),
+            ("English", "ENG"),
+            ("Mathematics", "MATH"),
+        ]
+        for name, code in defaults:
+            db.session.add(cls(name=name, code=code))
+        db.session.commit()
+
+    @classmethod
+    def choices(cls):
+        cls.ensure_defaults()
+        return [(row.name, row.name) for row in cls.query.order_by(cls.name)]
 
 
 class Attendance(db.Model):
@@ -170,6 +241,26 @@ class Assignment(db.Model):
 
     school_class = db.relationship("SchoolClass", back_populates="assignments")
     grades = db.relationship("Grade", back_populates="assignment", cascade="all, delete-orphan")
+    submissions = db.relationship("AssignmentSubmission", back_populates="assignment", cascade="all, delete-orphan")
+
+
+class AssignmentSubmission(db.Model):
+    __tablename__ = "assignment_submissions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    assignment_id = db.Column(db.Integer, db.ForeignKey("assignments.id"), nullable=False)
+    student_id = db.Column(db.Integer, db.ForeignKey("students.id"), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)
+    stored_filename = db.Column(db.String(255), nullable=False)
+    note = db.Column(db.Text, default="")
+    submitted_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    assignment = db.relationship("Assignment", back_populates="submissions")
+    student = db.relationship("Student")
+
+    @classmethod
+    def ensure_table(cls):
+        cls.__table__.create(db.engine, checkfirst=True)
 
 
 class Grade(db.Model):

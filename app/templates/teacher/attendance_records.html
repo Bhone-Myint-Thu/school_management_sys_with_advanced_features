@@ -2,7 +2,7 @@
 {% block page_title %}Attendance Records{% endblock %}
 {% block content %}
 <div class="toolbar">
-  <form class="filter-grid" method="get">
+  <form class="filter-grid auto-filter" method="get" data-auto-filter>
     <select class="form-select" name="year_group">
       <option value="">All grades</option>
       {% for grade in grade_choices %}<option value="{{ grade }}" {% if selected_year_group == grade %}selected{% endif %}>{{ grade }}</option>{% endfor %}
@@ -11,33 +11,37 @@
       <option value="0">All my classes</option>
       {% for class in classes %}<option value="{{ class.id }}" {% if selected_class_id == class.id %}selected{% endif %}>{{ class.name }}</option>{% endfor %}
     </select>
-    <button class="btn btn-primary">Filter</button>
+    <select class="form-select" name="month">
+      {% for value, label in months %}<option value="{{ value }}" {% if selected_month == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <select class="form-select" name="year">
+      {% for year in years %}<option value="{{ year }}" {% if selected_year == year %}selected{% endif %}>{{ year }}</option>{% endfor %}
+    </select>
   </form>
   <a class="btn btn-primary" href="{{ url_for('teacher.attendance_create') }}">Mark Attendance</a>
 </div>
 <section class="panel">
-  {% for grade in grouped_records %}
-    <div class="group-section">
-      <h2>{{ grade.grade }}</h2>
-      {% for class_group in grade.classes %}
-        <section class="nested-panel">
-          <div class="panel-title-row">
-            <h2>{{ class_group.class.name }}</h2>
-            <span class="badge status-draft">{{ class_group.rows|length }} records</span>
-          </div>
-          <table class="table">
-            <thead><tr><th>Date</th><th>Student</th><th>Status</th><th>Note</th></tr></thead>
-            <tbody>
-            {% for row in class_group.rows %}
-              <tr><td>{{ row.session_date }}</td><td><a class="table-link" href="{{ url_for('teacher.student_detail', student_id=row.student.id) }}">{{ row.student.full_name }}</a></td><td><span class="badge status-{{ row.status }}">{{ row.status|title }}</span></td><td>{{ row.note or "" }}</td></tr>
-            {% endfor %}
-            </tbody>
-          </table>
-        </section>
+  <div class="panel-title-row">
+    <h2>{{ selected_month_name }} {{ selected_year }}</h2>
+    <span class="badge status-draft">Click a day for details</span>
+  </div>
+  <div class="month-calendar">
+    {% for label in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] %}
+      <div class="month-weekday">{{ label }}</div>
+    {% endfor %}
+    {% for week in weeks %}
+      {% for day in week %}
+        <a class="month-day {% if not day.in_month %}muted{% endif %} {% if day.records %}has-records{% endif %}" href="{{ url_for('teacher.attendance_day_detail', session_date=day.date.isoformat(), year_group=selected_year_group, class_id=selected_class_id) }}">
+          <span>{{ day.date.day }}</span>
+          {% if day.records %}
+            <div class="month-day-stats">
+              <strong>{{ day.present|length + day.late|length }}</strong><small>Present</small>
+              <strong>{{ day.absent|length }}</strong><small>Absent</small>
+            </div>
+          {% endif %}
+        </a>
       {% endfor %}
-    </div>
-  {% else %}
-    <div class="alert alert-info">No attendance records match the selected grade and class.</div>
-  {% endfor %}
+    {% endfor %}
+  </div>
 </section>
 {% endblock %}

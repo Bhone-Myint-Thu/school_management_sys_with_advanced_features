@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block page_title %}Timetable{% endblock %}
+{% block page_subtitle %}Children weekly class calendars{% endblock %}
+{% block content %}
+{% for child in children %}
+  <section class="panel">
+    <div class="panel-title-row">
+      <div><h2>{{ child.full_name }}</h2><p class="subtle">{{ child.student_code }} · {{ child.year_group }}</p></div>
+      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('parent.student_detail', student_id=child.id) }}">Student Record</a>
+    </div>
+    {% set student = child %}
+    {% set timetable = slots_by_child.get(child.id, []) %}
+    {% include "partials/timetable_calendar.html" %}
+  </section>
+{% else %}
+  <section class="panel"><div class="alert alert-info">No children are connected to this parent account.</div></section>
+{% endfor %}
+{% endblock %}

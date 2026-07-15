@@ -1,6 +1,10 @@
+from datetime import date, timedelta
+from io import BytesIO
+
 from test_auth import login
 
-from app.models import User
+from app.extensions import db
+from app.models import Assignment, Attendance, Department, GradeLevel, SchoolClass, Student, Teacher, User
 
 
 def test_parent_can_download_child_report(client):
@@ -174,6 +178,147 @@ def test_settings_can_create_user_change_password_and_link_profile(client):
     assert b"Student Dashboard" in response.data
 
 
+def test_settings_can_create_managed_grade(client):
+    login(client, "admin@sms.example.com")
+    response = client.post(
+        "/admin/settings/grades/create",
+        data={"grade-sequence": "13"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"Grade 13 created with code G13." in response.data
+
+    with client.application.app_context():
+        grade = GradeLevel.query.filter_by(name="Grade 13").one()
+        assert grade.code == "G13"
+
+
+def test_settings_can_create_department(client):
+    login(client, "admin@sms.example.com")
+    response = client.post(
+        "/admin/settings/departments/create",
+        data={"department-name": "Computer Science", "department-code": "CS"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"Computer Science department created." in response.data
+
+    with client.application.app_context():
+        department = Department.query.filter_by(name="Computer Science").one()
+        assert department.code == "CS"
+
+
+def test_teacher_create_uses_grade_multiselect_and_auto_staff_code(client):
+    login(client, "admin@sms.example.com")
+    response = client.post(
+        "/admin/teachers/new",
+        data={
+            "email": "grade8.teacher@sms.example.com",
+            "password": "Password123",
+            "full_name": "Daw Grade Eight",
+            "department": "Science",
+            "grade_ids": ["8"],
+            "position": "teacher",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"Teacher saved." in response.data
+
+    with client.application.app_context():
+        teacher = Teacher.query.filter_by(full_name="Daw Grade Eight").one()
+        assert teacher.staff_code == "G08T001"
+        assert [grade.name for grade in teacher.grade_levels] == ["Grade 8"]
+
+
+def test_student_create_generates_grade_based_code_and_filters_classes(client):
+    login(client, "admin@sms.example.com")
+    response = client.get("/admin/students/new?year_group=Grade+8")
+    assert b"Grade 8 A - English" in response.data
+    assert b"Grade 10 A - Mathematics" not in response.data
+
+    response = client.post(
+        "/admin/students/new",
+        data={
+            "email": "new.grade8@sms.example.com",
+            "password": "Password123",
+            "full_name": "Mg New Grade",
+            "year_group": "Grade 8",
+            "date_of_birth": "2013-01-01",
+            "address": "Yangon",
+            "emergency_contact_name": "Guardian",
+            "emergency_contact_phone": "+950000",
+            "medical_notes": "",
+            "parent_ids": "0",
+            "class_ids": ["3"],
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"Student saved." in response.data
+
+    with client.application.app_context():
+        student = Student.query.filter_by(full_name="Mg New Grade").one()
+        assert student.student_code == "G08001"
+        assert student.classes[0].year_group == "Grade 8"
+
+
+def test_class_form_filters_students_by_selected_grade(client):
+    login(client, "admin@sms.example.com")
+    response = client.get("/admin/classes/new?year_group=Grade+8")
+    assert response.status_code == 200
+    assert b"Aye Chan" in response.data
+    assert b"Min Thu" not in response.data
+    assert b"Hnin Thu" not in response.data
+
+
+def test_class_create_rejects_student_from_another_grade(client):
+    login(client, "admin@sms.example.com")
+    response = client.post(
+        "/admin/classes/new",
+        data={
+            "teacher_id": "1",
+            "name": "Grade 8B Science",
+            "subject": "Science",
+            "year_group": "Grade 8",
+            "section": "B",
+            "room": "C103",
+            "student_ids": ["1"],
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"Only students from the selected grade" in response.data
+
+
+def test_class_and_timetable_lists_are_grouped_by_grade(client):
+    login(client, "admin@sms.example.com")
+    response = client.get("/admin/classes")
+    assert b"Grade 8" in response.data
+    assert b"Grade 10" in response.data
+
+    response = client.get("/admin/timetable?year_group=Grade+8")
+    assert b"Grade 8A English" in response.data
+    assert b"Grade 10A Mathematics" not in response.data
+
+
+def test_timetable_rejects_overlapping_class_slot(client):
+    login(client, "admin@sms.example.com")
+    response = client.post(
+        "/admin/timetable/new",
+        data={
+            "class_id": "1",
+            "day_of_week": "Monday",
+            "start_time": "09:30",
+            "end_time": "10:30",
+            "period": "Overlap",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"This class already has a timetable slot at that time." in response.data
+
+
 def test_notifications_can_be_marked_read(client):
     login(client, "parent@sms.example.com")
     response = client.get("/parent/")
@@ -187,3 +332,69 @@ def test_parent_student_detail_and_timetable_load(client):
     login(client, "parent@sms.example.com")
     assert client.get("/parent/students/1").status_code == 200
     assert client.get("/parent/students/1/timetable").status_code == 200
+    assert client.get("/parent/timetable").status_code == 200
+
+
+def test_student_timetable_and_assignment_upload(client):
+    login(client, "student@sms.example.com")
+    response = client.get("/student/timetable")
+    assert response.status_code == 200
+    assert b"weekly class calendar" in response.data
+    assert client.get("/student/assignments").status_code == 200
+
+    response = client.post(
+        "/student/assignments/1/upload",
+        data={"file": (BytesIO(b"homework"), "homework.txt"), "note": "Submitted"},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"Assignment uploaded." in response.data
+
+    response = client.post(
+        "/student/assignments/1/upload",
+        data={"file": (BytesIO(b"new homework"), "homework2.txt"), "note": "Updated"},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert b"Assignment re-uploaded." in response.data
+
+
+def test_student_cannot_upload_after_assignment_deadline(client):
+    with client.application.app_context():
+        school_class = db.session.get(SchoolClass, 1)
+        assignment = Assignment(
+            school_class=school_class,
+            title="Closed Assignment",
+            max_mark=100,
+            weight_pct=10,
+            due_date=date.today() - timedelta(days=1),
+        )
+        db.session.add(assignment)
+        db.session.commit()
+        assignment_id = assignment.id
+
+    login(client, "student@sms.example.com")
+    response = client.post(
+        f"/student/assignments/{assignment_id}/upload",
+        data={"file": (BytesIO(b"late"), "late.txt"), "note": "Late"},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert b"The upload deadline has passed." in response.data
+
+
+def test_teacher_attendance_month_calendar_and_day_detail(client):
+    with client.application.app_context():
+        row = Attendance.query.filter_by(status="absent").order_by(Attendance.session_date.desc()).first()
+        selected_date = row.session_date
+
+    login(client, "teacher@sms.example.com")
+    response = client.get(f"/teacher/attendance/records?month={selected_date.month}&year={selected_date.year}")
+    assert response.status_code == 200
+    assert b"Click a day for details" in response.data
+    assert b"Absent students" not in response.data
+
+    response = client.get(f"/teacher/attendance/records/{selected_date.isoformat()}")
+    assert response.status_code == 200
+    assert b"Absent Students" in response.data

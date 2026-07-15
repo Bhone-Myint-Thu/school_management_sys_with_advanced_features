@@ -2,7 +2,7 @@
 {% block page_title %}Students List{% endblock %}
 {% block content %}
 <div class="toolbar">
-  <form class="filter-grid" method="get">
+  <form class="filter-grid auto-filter" method="get" data-auto-filter>
     <input class="form-control" name="q" value="{{ search }}" placeholder="Search students by name, code, email">
     <select class="form-select" name="year_group">
       <option value="">All grades</option>
@@ -12,7 +12,6 @@
       <option value="0">All my classes</option>
       {% for class in classes %}<option value="{{ class.id }}" {% if selected_class_id == class.id %}selected{% endif %}>{{ class.name }}</option>{% endfor %}
     </select>
-    <button class="btn btn-primary">Filter</button>
   </form>
 </div>
 <section class="panel">

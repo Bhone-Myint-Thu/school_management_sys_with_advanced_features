@@ -2,7 +2,7 @@
 {% block page_title %}Create Assignment{% endblock %}
 {% block content %}
 <div class="toolbar">
-  <form class="filter-grid" method="get">
+  <form class="filter-grid auto-filter" method="get" data-auto-filter>
     <select class="form-select" name="year_group">
       <option value="">Choose grade</option>
       {% for grade in grade_choices %}<option value="{{ grade }}" {% if selected_year_group == grade %}selected{% endif %}>{{ grade }}</option>{% endfor %}
@@ -11,7 +11,6 @@
       <option value="0">Choose class</option>
       {% for class in scoped_classes %}<option value="{{ class.id }}" {% if selected_class_id == class.id %}selected{% endif %}>{{ class.name }}</option>{% endfor %}
     </select>
-    <button class="btn btn-primary">Apply</button>
   </form>
   <a class="btn btn-outline-primary" href="{{ url_for('teacher.assignment_records') }}">Assignment Records</a>
 </div>

@@ -1,12 +1,15 @@
+import calendar
 from datetime import date
+from pathlib import Path
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, send_from_directory, url_for
 from flask_login import current_user, login_required
+from sqlalchemy import extract
 
 from ..extensions import db
 from ..access import can_manage_leave, can_view_student, visible_students_query
 from ..forms import AssignmentForm, AttendanceForm, GradeForm, LeaveDecisionForm, MessageForm
-from ..models import Assignment, Attendance, Grade, LeaveRequest, Notice, Parent, SchoolClass, Student, SystemSetting, User, letter_for_mark
+from ..models import Assignment, AssignmentSubmission, Attendance, Grade, LeaveRequest, Notice, Parent, SchoolClass, Student, SystemSetting, User, letter_for_mark
 from ..security import roles_required
 from ..services import send_attendance_alert
 
@@ -55,6 +58,44 @@ def _teacher_class_context():
     if class_id and class_id not in {row.id for row in classes}:
         class_id = 0
     return year_group, class_id, classes
+
+
+def _group_attendance_by_date(records):
+    date_map = {}
+    for row in records:
+        bucket = date_map.get(row.session_date)
+        if bucket is None:
+            bucket = {"date": row.session_date, "records": [], "absent": [], "present": [], "late": []}
+            date_map[row.session_date] = bucket
+        bucket["records"].append(row)
+        if row.status == "absent":
+            bucket["absent"].append(row.student)
+        elif row.status == "late":
+            bucket["late"].append(row.student)
+        else:
+            bucket["present"].append(row.student)
+    return date_map
+
+
+def _attendance_month_grid(records, year, month):
+    date_map = _group_attendance_by_date(records)
+    weeks = []
+    for week in calendar.Calendar(firstweekday=0).monthdatescalendar(year, month):
+        week_cells = []
+        for day in week:
+            bucket = date_map.get(day, {"date": day, "records": [], "absent": [], "present": [], "late": []})
+            week_cells.append(
+                {
+                    "date": day,
+                    "in_month": day.month == month,
+                    "records": bucket["records"],
+                    "absent": bucket["absent"],
+                    "present": bucket["present"],
+                    "late": bucket["late"],
+                }
+            )
+        weeks.append(week_cells)
+    return weeks
 
 
 def _visible_students_for_context(year_group="", class_id=0):
@@ -121,10 +162,13 @@ def dashboard():
 @roles_required("teacher")
 def students():
     rows, search, year_group, class_id = _filter_students(visible_students_query())
+    class_query = SchoolClass.query.filter_by(teacher_id=current_user.teacher.id)
+    if year_group:
+        class_query = class_query.filter(SchoolClass.year_group == year_group)
     return render_template(
         "teacher/students.html",
         students=rows.order_by(Student.full_name).all(),
-        classes=_teacher_classes(),
+        classes=class_query.order_by(SchoolClass.year_group, SchoolClass.name).all(),
         grade_choices=_grade_choices(),
         search=search,
         selected_year_group=year_group,
@@ -245,18 +289,56 @@ def attendance_create():
 def attendance_records():
     class_query, year_group, class_id = _filter_teacher_classes(SchoolClass.query.filter_by(teacher_id=current_user.teacher.id))
     class_ids = [row.id for row in class_query.all()]
+    selected_year = request.args.get("year", type=int) or date.today().year
+    selected_month = request.args.get("month", type=int) or date.today().month
     records = (
         Attendance.query.join(SchoolClass)
-        .filter(Attendance.class_id.in_(class_ids))
+        .filter(
+            Attendance.class_id.in_(class_ids),
+            extract("year", Attendance.session_date) == selected_year,
+            extract("month", Attendance.session_date) == selected_month,
+        )
         .order_by(SchoolClass.year_group, SchoolClass.name, Attendance.session_date.desc())
         .all()
     )
     return render_template(
         "teacher/attendance_records.html",
         records=records,
-        grouped_records=_group_by_grade_class(records, lambda row: row.school_class),
-        classes=_teacher_classes(),
+        weeks=_attendance_month_grid(records, selected_year, selected_month),
+        classes=class_query.order_by(SchoolClass.year_group, SchoolClass.name).all(),
         grade_choices=_grade_choices(),
+        selected_year_group=year_group,
+        selected_class_id=class_id,
+        selected_year=selected_year,
+        selected_month=selected_month,
+        selected_month_name=calendar.month_name[selected_month],
+        years=list(range(date.today().year - 2, date.today().year + 3)),
+        months=[(i, calendar.month_name[i]) for i in range(1, 13)],
+    )
+
+
+@bp.route("/attendance/records/<session_date>")
+@login_required
+@roles_required("teacher")
+def attendance_day_detail(session_date):
+    try:
+        selected_date = date.fromisoformat(session_date)
+    except ValueError:
+        return ("Bad request", 400)
+    class_query, year_group, class_id = _filter_teacher_classes(SchoolClass.query.filter_by(teacher_id=current_user.teacher.id))
+    class_ids = [row.id for row in class_query.all()]
+    records = (
+        Attendance.query.join(SchoolClass).join(Student)
+        .filter(Attendance.class_id.in_(class_ids), Attendance.session_date == selected_date)
+        .order_by(SchoolClass.year_group, SchoolClass.name, Student.full_name)
+        .all()
+    )
+    grouped = _group_attendance_by_date(records).get(selected_date, {"records": [], "absent": [], "present": [], "late": []})
+    return render_template(
+        "teacher/attendance_day_detail.html",
+        selected_date=selected_date,
+        records=records,
+        grouped=grouped,
         selected_year_group=year_group,
         selected_class_id=class_id,
     )
@@ -305,6 +387,7 @@ def assignment_create():
 @login_required
 @roles_required("teacher")
 def assignment_records():
+    AssignmentSubmission.ensure_table()
     class_query, year_group, class_id = _filter_teacher_classes(SchoolClass.query.filter_by(teacher_id=current_user.teacher.id))
     class_ids = [row.id for row in class_query.all()]
     rows = (
@@ -317,11 +400,23 @@ def assignment_records():
         "teacher/assignment_records.html",
         assignments=rows,
         grouped_assignments=_group_by_grade_class(rows, lambda row: row.school_class),
-        classes=_teacher_classes(),
+        classes=class_query.order_by(SchoolClass.year_group, SchoolClass.name).all(),
         grade_choices=_grade_choices(),
         selected_year_group=year_group,
         selected_class_id=class_id,
     )
+
+
+@bp.route("/assignments/submissions/<int:submission_id>/download")
+@login_required
+@roles_required("teacher")
+def assignment_submission_download(submission_id):
+    AssignmentSubmission.ensure_table()
+    submission = db.get_or_404(AssignmentSubmission, submission_id)
+    if submission.assignment.school_class.teacher_id != current_user.teacher.id:
+        return ("Forbidden", 403)
+    upload_dir = Path(current_app.instance_path) / "uploads" / "assignments"
+    return send_from_directory(upload_dir, submission.stored_filename, as_attachment=True, download_name=submission.original_filename)
 
 
 @bp.route("/grades", methods=["GET", "POST"])
@@ -335,6 +430,7 @@ def grades():
 @login_required
 @roles_required("teacher")
 def grade_create():
+    AssignmentSubmission.ensure_table()
     selected_year_group, selected_class_id, scoped_classes = _teacher_class_context()
     form = GradeForm()
     form.assignment_id.choices = [
@@ -384,7 +480,7 @@ def grade_records():
         "teacher/grade_records.html",
         grades=rows,
         grouped_grades=_group_by_grade_class(rows, lambda row: row.assignment.school_class),
-        classes=_teacher_classes(),
+        classes=class_query.order_by(SchoolClass.year_group, SchoolClass.name).all(),
         grade_choices=_grade_choices(),
         selected_year_group=year_group,
         selected_class_id=class_id,

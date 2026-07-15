@@ -34,6 +34,7 @@
           <div>
             <h3>{{ teacher.full_name }}</h3>
             <p>{{ teacher.department }} · {{ teacher.staff_code }}</p>
+            <small>{{ teacher.grade_levels|map(attribute="name")|join(", ") or "No grade assigned" }}</small>
           </div>
         </div>
         <div class="detail-grid">

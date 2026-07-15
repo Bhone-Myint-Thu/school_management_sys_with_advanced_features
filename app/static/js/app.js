@@ -78,3 +78,44 @@ const updateSignupFields = () => {
 
 signupRole?.addEventListener("change", updateSignupFields);
 updateSignupFields();
+
+document.querySelectorAll("[data-auto-filter]").forEach((form) => {
+  const grade = form.querySelector('select[name="year_group"]');
+  const classSelect = form.querySelector('select[name="class_id"]');
+  grade?.addEventListener("change", () => {
+    if (classSelect) classSelect.value = "0";
+    form.requestSubmit();
+  });
+  classSelect?.addEventListener("change", () => form.requestSubmit());
+  form.querySelectorAll("select").forEach((select) => {
+    if (select === grade || select === classSelect) return;
+    select.addEventListener("change", () => form.requestSubmit());
+  });
+});
+
+document.querySelectorAll("form[data-dependent-url]").forEach((form) => {
+  const source = form.elements[form.dataset.dependentSource];
+  const target = form.elements[form.dataset.dependentTarget];
+  if (!source || !target) return;
+  const selectedValues = new Set(Array.from(target.selectedOptions || []).map((option) => option.value));
+
+  const rebuildOptions = async () => {
+    const url = new URL(form.dataset.dependentUrl, window.location.origin);
+    url.searchParams.set("year_group", source.value || "");
+    const options = await fetch(url).then((response) => response.ok ? response.json() : []);
+    target.innerHTML = "";
+    options.forEach((item) => {
+      const option = document.createElement("option");
+      option.value = item.value;
+      option.textContent = item.label;
+      option.selected = selectedValues.has(String(item.value));
+      target.appendChild(option);
+    });
+  };
+
+  source.addEventListener("change", () => {
+    selectedValues.clear();
+    rebuildOptions();
+  });
+  rebuildOptions();
+});

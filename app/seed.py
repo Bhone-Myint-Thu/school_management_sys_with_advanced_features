@@ -4,7 +4,9 @@ from .extensions import db
 from .models import (
     Assignment,
     Attendance,
+    Department,
     Grade,
+    GradeLevel,
     LeaveRequest,
     Message,
     Notice,
@@ -35,11 +37,19 @@ def make_teacher(email, role, full_name, department, staff_code, position):
 
 def seed_demo_data():
     db.session.add(SystemSetting(id=1))
+    GradeLevel.ensure_defaults()
+    Department.ensure_defaults()
+    grade_8 = GradeLevel.query.filter_by(name="Grade 8").one()
+    grade_10 = GradeLevel.query.filter_by(name="Grade 10").one()
     admin = make_user("admin@sms.example.com", "admin")
     headmaster = make_teacher("headmaster@sms.example.com", "headmaster", "Dr. Hla Min", "Leadership", "HM-001", "headmaster")
     dean = make_teacher("dean@sms.example.com", "dean", "Daw Thiri Win", "Academic Affairs", "D-001", "dean")
     teacher = make_teacher("teacher@sms.example.com", "teacher", "Daw May Hnin", "Science", "T-1001", "teacher")
     second_teacher = make_teacher("teacher2@sms.example.com", "teacher", "U Zaw Lin", "English", "T-1002", "teacher")
+    headmaster.grade_levels.extend([grade_8, grade_10])
+    dean.grade_levels.extend([grade_8, grade_10])
+    teacher.grade_levels.append(grade_10)
+    second_teacher.grade_levels.append(grade_8)
 
     parent_user = make_user("parent@sms.example.com", "parent")
     parent = Parent(

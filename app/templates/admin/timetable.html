@@ -12,8 +12,17 @@
   <a class="btn btn-primary" href="{{ url_for('admin.timetable_create') }}">Add Timetable Slot</a>
 </div>
 <section class="panel">
-  <table class="table"><thead><tr><th>Class</th><th>Grade</th><th>Teacher</th><th>Slots</th></tr></thead>
-    <tbody>{% for class in classes %}<tr><td><a class="table-link" href="{{ url_for('admin.timetable_detail', class_id=class.id) }}">{{ class.name }}</a></td><td>{{ class.year_group }}</td><td>{{ class.teacher.full_name }}</td><td>{{ class.timetable|length }}</td></tr>{% endfor %}</tbody>
-  </table>
+  {% for grade in grouped_classes %}
+    <div class="group-section">
+      <h2>{{ grade.grade }}</h2>
+      <section class="nested-panel">
+        <table class="table"><thead><tr><th>Class</th><th>Teacher</th><th>Room</th><th>Slots</th></tr></thead>
+          <tbody>{% for class in grade.classes %}<tr><td><a class="table-link" href="{{ url_for('admin.timetable_detail', class_id=class.id) }}">{{ class.name }}</a></td><td>{{ class.teacher.full_name }}</td><td>{{ class.room }}</td><td>{{ class.timetable|length }}</td></tr>{% endfor %}</tbody>
+        </table>
+      </section>
+    </div>
+  {% else %}
+    <div class="alert alert-info">No timetable classes match the selected grade.</div>
+  {% endfor %}
 </section>
 {% endblock %}

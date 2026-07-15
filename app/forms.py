@@ -1,4 +1,5 @@
 from flask_wtf import FlaskForm
+from flask_wtf.file import FileAllowed, FileField, FileRequired
 from wtforms import BooleanField, DateField, FloatField, IntegerField, PasswordField, SelectField, SelectMultipleField, StringField, SubmitField, TextAreaField, TimeField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, NumberRange, Optional
 
@@ -26,15 +27,14 @@ class StudentForm(FlaskForm):
     email = StringField("Email", validators=[DataRequired(), Email()])
     password = PasswordField("Password", validators=[Optional(), Length(min=8)])
     full_name = StringField("Full name", validators=[DataRequired(), Length(max=120)])
-    year_group = StringField("Year group", validators=[DataRequired(), Length(max=20)])
+    year_group = SelectField("Grade", validators=[DataRequired()])
     date_of_birth = DateField("Date of birth", validators=[DataRequired()])
-    student_code = StringField("Student code", validators=[DataRequired(), Length(max=30)])
     address = StringField("Address", validators=[Optional(), Length(max=255)])
     emergency_contact_name = StringField("Emergency contact name", validators=[Optional(), Length(max=120)])
     emergency_contact_phone = StringField("Emergency contact phone", validators=[Optional(), Length(max=40)])
     medical_notes = StringField("Medical notes", validators=[Optional(), Length(max=255)])
     parent_ids = SelectField("Parent", coerce=int, validators=[Optional()])
-    class_ids = SelectMultipleField("Classes", coerce=int, validators=[Optional()])
+    class_ids = SelectMultipleField("Classes", coerce=int, validators=[Optional()], validate_choice=False)
     submit = SubmitField("Save student")
 
 
@@ -53,8 +53,8 @@ class TeacherForm(FlaskForm):
     email = StringField("Email", validators=[DataRequired(), Email()])
     password = PasswordField("Password", validators=[Optional(), Length(min=8)])
     full_name = StringField("Full name", validators=[DataRequired(), Length(max=120)])
-    department = StringField("Department", validators=[DataRequired(), Length(max=80)])
-    staff_code = StringField("Staff code", validators=[DataRequired(), Length(max=30)])
+    department = SelectField("Department", validators=[DataRequired()])
+    grade_ids = SelectMultipleField("Grades", coerce=int, validators=[DataRequired()])
     position = SelectField(
         "Position",
         choices=[("teacher", "Teacher"), ("dean", "Dean"), ("headmaster", "Headmaster")],
@@ -67,10 +67,10 @@ class ClassForm(FlaskForm):
     teacher_id = SelectField("Teacher", coerce=int, validators=[DataRequired()])
     name = StringField("Class name", validators=[DataRequired(), Length(max=80)])
     subject = StringField("Subject", validators=[DataRequired(), Length(max=80)])
-    year_group = StringField("Year group", validators=[DataRequired(), Length(max=20)])
+    year_group = SelectField("Grade", validators=[DataRequired()])
     section = StringField("Section", validators=[DataRequired(), Length(max=20)])
     room = StringField("Room", validators=[DataRequired(), Length(max=30)])
-    student_ids = SelectMultipleField("Students", coerce=int, validators=[Optional()])
+    student_ids = SelectMultipleField("Students", coerce=int, validators=[Optional()], validate_choice=False)
     submit = SubmitField("Save class")
 
 
@@ -101,7 +101,7 @@ class AssignmentForm(FlaskForm):
     title = StringField("Title", validators=[DataRequired(), Length(max=120)])
     max_mark = FloatField("Max mark", validators=[DataRequired(), NumberRange(min=1)])
     weight_pct = FloatField("Weight %", validators=[DataRequired(), NumberRange(min=0, max=100)])
-    due_date = DateField("Due date", validators=[DataRequired()])
+    due_date = DateField("Deadline", validators=[DataRequired()])
     submit = SubmitField("Save assignment")
 
 
@@ -111,6 +111,15 @@ class GradeForm(FlaskForm):
     mark = FloatField("Mark", validators=[DataRequired(), NumberRange(min=0)])
     feedback = TextAreaField("Feedback", validators=[Optional()])
     submit = SubmitField("Save grade")
+
+
+class AssignmentSubmissionForm(FlaskForm):
+    file = FileField(
+        "Upload assignment",
+        validators=[FileRequired(), FileAllowed(["pdf", "doc", "docx", "txt", "png", "jpg", "jpeg", "zip"], "Unsupported file type.")],
+    )
+    note = TextAreaField("Note", validators=[Optional(), Length(max=1000)])
+    submit = SubmitField("Upload work")
 
 
 class MessageForm(FlaskForm):
@@ -204,6 +213,17 @@ class ProfileUserLinkForm(FlaskForm):
     profile_ref = SelectField("Student / Parent / Teacher profile", validators=[DataRequired()])
     user_id = SelectField("User account", coerce=int, validators=[DataRequired()])
     submit = SubmitField("Connect account")
+
+
+class GradeLevelForm(FlaskForm):
+    sequence = IntegerField("Grade number", validators=[DataRequired(), NumberRange(min=1, max=99)])
+    submit = SubmitField("Create grade")
+
+
+class DepartmentForm(FlaskForm):
+    name = StringField("Department name", validators=[DataRequired(), Length(max=80)])
+    code = StringField("Department code", validators=[Optional(), Length(max=10)])
+    submit = SubmitField("Create department")
 
 
 class DateFilterForm(FlaskForm):

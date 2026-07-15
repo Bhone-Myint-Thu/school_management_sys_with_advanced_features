@@ -7,7 +7,7 @@
   <script>
     document.documentElement.dataset.theme = localStorage.getItem("sms-theme") || "light";
   </script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v='6') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v='9') }}">
 </head>
 <body>
   {% if current_user.is_authenticated %}
@@ -129,10 +129,12 @@
           </div>
         {% elif current_user.role == 'parent' %}
           <a class="nav-link {% if request.endpoint == 'parent.students' %}active{% endif %}" href="{{ url_for('parent.students') }}"><span>◉</span>Students</a>
+          <a class="nav-link {% if request.endpoint.startswith('parent.timetable') or request.endpoint == 'parent.student_timetable' %}active{% endif %}" href="{{ url_for('parent.timetable') }}"><span>◴</span>Timetable</a>
           <a class="nav-link {% if request.endpoint == 'parent.leave' %}active{% endif %}" href="{{ url_for('parent.leave') }}"><span>◷</span>Leave</a>
           <a class="nav-link {% if request.endpoint.startswith('parent.messages') %}active{% endif %}" href="{{ url_for('parent.messages') }}"><span>✉</span>Messages</a>
         {% elif current_user.role == 'student' %}
-          <a class="nav-link" href="{{ url_for('student.dashboard') }}"><span>◴</span>Timetable</a>
+          <a class="nav-link {% if request.endpoint == 'student.timetable' %}active{% endif %}" href="{{ url_for('student.timetable') }}"><span>◴</span>Timetable</a>
+          <a class="nav-link {% if request.endpoint.startswith('student.assignment') %}active{% endif %}" href="{{ url_for('student.assignments') }}"><span>□</span>Assignments</a>
         {% endif %}
       </nav>
       <div class="school-status">
@@ -160,7 +162,7 @@
     </main>
   {% endif %}
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-  <script src="{{ url_for('static', filename='js/app.js', v='3') }}"></script>
+  <script src="{{ url_for('static', filename='js/app.js', v='5') }}"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -3,7 +3,7 @@ from flask_login import current_user, login_required
 
 from ..extensions import db
 from ..forms import LeaveRequestForm, MessageForm
-from ..models import LeaveRequest, Message, Notice, SystemSetting, Teacher, User
+from ..models import LeaveRequest, Message, Notice, SystemSetting, Teacher, Timetable, User
 from ..security import roles_required
 from ..services import build_student_report_pdf
 
@@ -38,6 +38,17 @@ def students():
     return render_template("parent/students.html", children=children, search=search)
 
 
+@bp.route("/timetable")
+@login_required
+@roles_required("parent")
+def timetable():
+    children = current_user.parent.students
+    child_ids = [school_class.id for child in children for school_class in child.classes]
+    slots = Timetable.query.filter(Timetable.class_id.in_(child_ids)).order_by(Timetable.day_of_week, Timetable.start_time).all()
+    slots_by_child = {child.id: [slot for slot in slots if slot.class_id in {school_class.id for school_class in child.classes}] for child in children}
+    return render_template("parent/timetable.html", children=children, slots_by_child=slots_by_child, days=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])
+
+
 @bp.route("/students/<int:student_id>")
 @login_required
 @roles_required("parent")
@@ -56,7 +67,9 @@ def student_timetable(student_id):
     if student is None:
         return ("Not found", 404)
     days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-    return render_template("parent/student_timetable.html", student=student, days=days)
+    class_ids = [school_class.id for school_class in student.classes]
+    timetable = Timetable.query.filter(Timetable.class_id.in_(class_ids)).order_by(Timetable.day_of_week, Timetable.start_time).all()
+    return render_template("parent/student_timetable.html", student=student, days=days, timetable=timetable)
 
 
 @bp.route("/leave", methods=["GET", "POST"])
