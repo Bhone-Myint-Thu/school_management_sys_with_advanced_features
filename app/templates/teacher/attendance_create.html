@@ -14,14 +14,58 @@
   </form>
   <a class="btn btn-outline-primary" href="{{ url_for('teacher.attendance_records') }}">Check Records</a>
 </div>
-<section class="panel narrow">
+<section class="panel">
   <div class="panel-title-row">
-    <h2>Create Attendance</h2>
-    <span class="badge status-draft">Grade then class</span>
+    <h2>Create Attendance for Class</h2>
+    <span class="badge status-draft">Everyone is present by default</span>
   </div>
-  {% if not scoped_classes %}
+  {% if not selected_class %}
+    {% if not scoped_classes %}
     <div class="alert alert-warning">No classes match the selected grade.</div>
+    {% else %}
+    <div class="alert alert-warning">Choose a grade and class to load its student roster.</div>
+    {% endif %}
+  {% elif not roster %}
+    <div class="alert alert-warning">There are no students assigned to {{ selected_class.name }}.</div>
+  {% else %}
+  <form method="post" class="attendance-roster-form">
+    {{ form.hidden_tag() }}
+    <div class="grid-2">
+      <div class="form-field">
+        {{ form.class_id.label(class="form-label") }}
+        {{ form.class_id(class="form-select") }}
+        {% for error in form.class_id.errors %}<div class="form-text text-danger">{{ error }}</div>{% endfor %}
+      </div>
+      <div class="form-field">
+        {{ form.session_date.label(class="form-label") }}
+        {{ form.session_date(class="form-control") }}
+        {% for error in form.session_date.errors %}<div class="form-text text-danger">{{ error }}</div>{% endfor %}
+      </div>
+    </div>
+    <div class="roster-heading">
+      <div>
+        <h3>Students in {{ selected_class.name }}</h3>
+        <p class="text-muted">Uncheck students who are absent, then save once for the whole class.</p>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-ghost btn-sm" type="button" data-roster-action="all">Mark all present</button>
+        <button class="btn btn-outline-danger btn-sm" type="button" data-roster-action="none">Clear all</button>
+      </div>
+    </div>
+    <div class="attendance-roster">
+      {% for value, label in form.present_student_ids.choices %}
+      <label class="roster-student">
+        <input type="checkbox" name="present_student_ids" value="{{ value }}" {% if value in form.present_student_ids.data %}checked{% endif %}>
+        <span><strong>{{ label }}</strong><small>Present</small></span>
+      </label>
+      {% endfor %}
+    </div>
+    {% for error in form.present_student_ids.errors %}<div class="form-text text-danger">{{ error }}</div>{% endfor %}
+    <div class="roster-save">
+      <span><strong data-present-count>{{ form.present_student_ids.data|length }}</strong> of {{ roster|length }} marked present</span>
+      {{ form.submit(class="btn btn-primary") }}
+    </div>
+  </form>
   {% endif %}
-  <form method="post">{% include "partials/form.html" %}</form>
 </section>
 {% endblock %}

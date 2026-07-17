@@ -89,11 +89,11 @@ class TimetableForm(FlaskForm):
 
 class AttendanceForm(FlaskForm):
     class_id = SelectField("Class", coerce=int, validators=[DataRequired()])
-    student_id = SelectField("Student", coerce=int, validators=[DataRequired()])
     session_date = DateField("Session date", validators=[DataRequired()])
-    status = SelectField("Status", choices=[("present", "Present"), ("late", "Late"), ("absent", "Absent")])
-    note = StringField("Note", validators=[Optional(), Length(max=255)])
-    submit = SubmitField("Save attendance")
+    present_student_ids = SelectMultipleField(
+        "Present students", coerce=int, validators=[Optional()], validate_choice=False
+    )
+    submit = SubmitField("Save class attendance")
 
 
 class AssignmentForm(FlaskForm):

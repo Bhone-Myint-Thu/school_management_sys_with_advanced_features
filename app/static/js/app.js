@@ -119,3 +119,26 @@ document.querySelectorAll("form[data-dependent-url]").forEach((form) => {
   });
   rebuildOptions();
 });
+
+document.querySelectorAll(".attendance-roster-form").forEach((form) => {
+  const checkboxes = Array.from(form.querySelectorAll('input[name="present_student_ids"]'));
+  const count = form.querySelector("[data-present-count]");
+  const update = () => {
+    checkboxes.forEach((checkbox) => {
+      checkbox.closest(".roster-student")?.classList.toggle("is-absent", !checkbox.checked);
+      const status = checkbox.closest(".roster-student")?.querySelector("small");
+      if (status) status.textContent = checkbox.checked ? "Present" : "Absent";
+    });
+    if (count) count.textContent = checkboxes.filter((checkbox) => checkbox.checked).length;
+  };
+  form.querySelector('[data-roster-action="all"]')?.addEventListener("click", () => {
+    checkboxes.forEach((checkbox) => { checkbox.checked = true; });
+    update();
+  });
+  form.querySelector('[data-roster-action="none"]')?.addEventListener("click", () => {
+    checkboxes.forEach((checkbox) => { checkbox.checked = false; });
+    update();
+  });
+  checkboxes.forEach((checkbox) => checkbox.addEventListener("change", update));
+  update();
+});

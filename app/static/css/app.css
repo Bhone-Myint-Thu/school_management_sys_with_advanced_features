@@ -535,6 +535,36 @@ input[type="checkbox"].form-control {
   padding: 0;
 }
 
+.roster-heading, .roster-save, .attendance-class-stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.roster-heading { margin: 8px 0 16px; }
+.roster-heading h3, .roster-heading p, .class-attendance-detail h2, .class-attendance-detail p { margin: 0; }
+.attendance-roster { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+.roster-student {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #b9d8c5;
+  border-radius: 10px;
+  background: #f1fbf5;
+  cursor: pointer;
+}
+.roster-student input { width: 19px; height: 19px; accent-color: var(--success); }
+.roster-student span { display: grid; gap: 3px; }
+.roster-student small { color: var(--success); font-weight: 800; }
+.roster-student.is-absent { border-color: #f3b6bf; background: #fff6f7; }
+.roster-student.is-absent small { color: var(--danger); }
+.roster-save { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+.attendance-class-stats { justify-content: flex-start; margin: 16px 0; }
+.attendance-class-stats span { padding: 9px 13px; border-radius: 8px; background: var(--primary-soft); }
+
 .form-text { font-size: 13px; margin-top: 5px; }
 
 .btn {

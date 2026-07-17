@@ -252,26 +252,53 @@ def attendance():
 @roles_required("teacher")
 def attendance_create():
     selected_year_group, selected_class_id, scoped_classes = _teacher_class_context()
-    form = AttendanceForm(session_date=date.today())
+    try:
+        requested_date = date.fromisoformat(request.args.get("session_date", ""))
+    except ValueError:
+        requested_date = date.today()
+    form = AttendanceForm(session_date=requested_date)
     form.class_id.choices = [(row.id, f"{row.year_group} - {row.name}") for row in scoped_classes]
-    form.student_id.choices = [
-        (row.id, f"{row.full_name} ({row.year_group})") for row in _visible_students_for_context(selected_year_group, selected_class_id)
-    ]
+    posted_class_id = request.form.get("class_id", type=int) if request.method == "POST" else selected_class_id
+    selected_class = next((row for row in scoped_classes if row.id == posted_class_id), None)
+    roster = sorted(selected_class.students, key=lambda student: student.full_name) if selected_class else []
+    form.present_student_ids.choices = [(student.id, student.full_name) for student in roster]
     if selected_class_id and request.method == "GET":
         form.class_id.data = selected_class_id
+        existing = Attendance.query.filter_by(class_id=selected_class_id, session_date=form.session_date.data).all()
+        if existing:
+            form.present_student_ids.data = [row.student_id for row in existing if row.status != "absent"]
+        else:
+            form.present_student_ids.data = [student.id for student in roster]
     if form.validate_on_submit():
-        row = Attendance.query.filter_by(
-            class_id=form.class_id.data,
-            student_id=form.student_id.data,
-            session_date=form.session_date.data,
-        ).first() or Attendance(class_id=form.class_id.data, student_id=form.student_id.data, session_date=form.session_date.data)
-        row.status = form.status.data
-        row.note = form.note.data
-        db.session.add(row)
+        if selected_class is None:
+            return ("Forbidden", 403)
+        roster_ids = {student.id for student in roster}
+        present_ids = set(form.present_student_ids.data) & roster_ids
+        existing_by_student = {
+            row.student_id: row
+            for row in Attendance.query.filter_by(class_id=selected_class.id, session_date=form.session_date.data).all()
+        }
+        for student in roster:
+            row = existing_by_student.get(student.id) or Attendance(
+                class_id=selected_class.id,
+                student_id=student.id,
+                session_date=form.session_date.data,
+            )
+            row.status = "present" if student.id in present_ids else "absent"
+            row.note = None
+            db.session.add(row)
         db.session.commit()
-        send_attendance_alert(row.student)
-        flash("Attendance saved.", "success")
-        return redirect(url_for("teacher.attendance_records"))
+        for student in roster:
+            send_attendance_alert(student)
+        flash(f"Attendance saved for {len(roster)} students in {selected_class.name}.", "success")
+        return redirect(
+            url_for(
+                "teacher.attendance_day_detail",
+                session_date=form.session_date.data.isoformat(),
+                year_group=selected_class.year_group,
+                class_id=selected_class.id,
+            )
+        )
     return render_template(
         "teacher/attendance_create.html",
         form=form,
@@ -280,6 +307,8 @@ def attendance_create():
         grade_choices=_grade_choices(),
         selected_year_group=selected_year_group,
         selected_class_id=selected_class_id,
+        selected_class=selected_class,
+        roster=roster,
     )
 
 
@@ -333,12 +362,24 @@ def attendance_day_detail(session_date):
         .order_by(SchoolClass.year_group, SchoolClass.name, Student.full_name)
         .all()
     )
-    grouped = _group_attendance_by_date(records).get(selected_date, {"records": [], "absent": [], "present": [], "late": []})
+    class_groups = []
+    for school_class in class_query.order_by(SchoolClass.year_group, SchoolClass.name).all():
+        class_records = [row for row in records if row.class_id == school_class.id]
+        if not class_records:
+            continue
+        class_groups.append(
+            {
+                "class": school_class,
+                "records": class_records,
+                "present": [row for row in class_records if row.status == "present"],
+                "late": [row for row in class_records if row.status == "late"],
+                "absent": [row for row in class_records if row.status == "absent"],
+            }
+        )
     return render_template(
         "teacher/attendance_day_detail.html",
         selected_date=selected_date,
-        records=records,
-        grouped=grouped,
+        class_groups=class_groups,
         selected_year_group=year_group,
         selected_class_id=class_id,
     )

@@ -4,35 +4,26 @@
 {% block content %}
 <div class="toolbar">
   <a class="btn btn-outline-primary" href="{{ url_for('teacher.attendance_records', year=selected_date.year, month=selected_date.month, year_group=selected_year_group, class_id=selected_class_id) }}">Back to Calendar</a>
-  <a class="btn btn-primary" href="{{ url_for('teacher.attendance_create') }}">Mark Attendance</a>
+  <a class="btn btn-primary" href="{{ url_for('teacher.attendance_create', session_date=selected_date.isoformat(), year_group=selected_year_group, class_id=selected_class_id) }}">Mark Attendance</a>
 </div>
-<div class="stat-grid">
-  <div class="stat-card"><span>Present</span><strong>{{ grouped.present|length }}</strong></div>
-  <div class="stat-card"><span>Late</span><strong>{{ grouped.late|length }}</strong></div>
-  <div class="stat-card"><span>Absent</span><strong>{{ grouped.absent|length }}</strong></div>
-</div>
-<section class="panel">
+{% for group in class_groups %}
+<section class="panel class-attendance-detail">
   <div class="panel-title-row">
-    <h2>Absent Students</h2>
-    <span class="badge status-absent">{{ grouped.absent|length }}</span>
+    <div><h2>{{ group.class.name }}</h2><p class="text-muted">{{ group.class.year_group }} · {{ group.class.subject }}</p></div>
+    <a class="btn btn-outline-primary btn-sm" href="{{ url_for('teacher.attendance_create', session_date=selected_date.isoformat(), year_group=group.class.year_group, class_id=group.class.id) }}">Edit class attendance</a>
   </div>
-  <div class="notice-list">
-    {% for student in grouped.absent %}
-      <article><strong><a class="table-link" href="{{ url_for('teacher.student_detail', student_id=student.id) }}">{{ student.full_name }}</a></strong><p>{{ student.student_code }} · {{ student.year_group }}</p></article>
-    {% else %}
-      <article><strong>No absent students</strong><p>All marked students attended or were late.</p></article>
-    {% endfor %}
+  <div class="attendance-class-stats">
+    <span><strong>{{ group.present|length }}</strong> Present</span>
+    <span><strong>{{ group.late|length }}</strong> Late</span>
+    <span><strong>{{ group.absent|length }}</strong> Absent Students</span>
   </div>
-</section>
-<section class="panel">
-  <h2>All Records</h2>
   <table class="table">
-    <thead><tr><th>Class</th><th>Student</th><th>Status</th><th>Note</th></tr></thead>
+    <thead><tr><th>Student</th><th>Student code</th><th>Status</th><th>Note</th></tr></thead>
     <tbody>
-    {% for row in records %}
+    {% for row in group.records %}
       <tr>
-        <td>{{ row.school_class.name }}</td>
         <td><a class="table-link" href="{{ url_for('teacher.student_detail', student_id=row.student.id) }}">{{ row.student.full_name }}</a></td>
+        <td>{{ row.student.student_code }}</td>
         <td><span class="badge status-{{ row.status }}">{{ row.status|title }}</span></td>
         <td>{{ row.note or "" }}</td>
       </tr>
@@ -40,4 +31,7 @@
     </tbody>
   </table>
 </section>
+{% else %}
+<section class="panel"><h2>No attendance records</h2><p class="text-muted">No class attendance has been saved for this date.</p></section>
+{% endfor %}
 {% endblock %}

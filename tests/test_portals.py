@@ -398,3 +398,38 @@ def test_teacher_attendance_month_calendar_and_day_detail(client):
     response = client.get(f"/teacher/attendance/records/{selected_date.isoformat()}")
     assert response.status_code == 200
     assert b"Absent Students" in response.data
+
+
+def test_teacher_can_save_whole_class_attendance(client):
+    login(client, "teacher@sms.example.com")
+    response = client.get("/teacher/attendance/create?year_group=Grade+10&class_id=1")
+    assert response.status_code == 200
+    assert b"Min Thu" in response.data
+    assert b"Hnin Thu" in response.data
+
+    response = client.post(
+        "/teacher/attendance/create?year_group=Grade+10&class_id=1",
+        data={
+            "class_id": "1",
+            "session_date": date.today().isoformat(),
+            "present_student_ids": ["1"],
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"Attendance saved for 2 students" in response.data
+
+    with client.application.app_context():
+        records = Attendance.query.filter_by(class_id=1, session_date=date.today()).all()
+        statuses = {row.student_id: row.status for row in records}
+        assert statuses == {1: "present", 2: "absent"}
+
+
+def test_teacher_attendance_detail_is_scoped_by_class(client):
+    login(client, "teacher@sms.example.com")
+    response = client.get(
+        f"/teacher/attendance/records/{date.today().isoformat()}?year_group=Grade+10&class_id=1"
+    )
+    assert response.status_code == 200
+    assert b"Grade 10A Mathematics" in response.data
+    assert b"Grade 10A Science" not in response.data
