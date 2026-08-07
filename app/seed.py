@@ -40,16 +40,19 @@ def seed_demo_data():
     GradeLevel.ensure_defaults()
     Department.ensure_defaults()
     grade_8 = GradeLevel.query.filter_by(name="Grade 8").one()
+    grade_9 = GradeLevel.query.filter_by(name="Grade 9").one()
     grade_10 = GradeLevel.query.filter_by(name="Grade 10").one()
     admin = make_user("admin@sms.example.com", "admin")
     headmaster = make_teacher("headmaster@sms.example.com", "headmaster", "Dr. Hla Min", "Leadership", "HM-001", "headmaster")
     dean = make_teacher("dean@sms.example.com", "dean", "Daw Thiri Win", "Academic Affairs", "D-001", "dean")
     teacher = make_teacher("teacher@sms.example.com", "teacher", "Daw May Hnin", "Science", "T-1001", "teacher")
     second_teacher = make_teacher("teacher2@sms.example.com", "teacher", "U Zaw Lin", "English", "T-1002", "teacher")
+    third_teacher = make_teacher("teacher3@sms.example.com", "teacher", "U Kyaw Naing", "Mathematics", "T-1003", "teacher")
     headmaster.grade_levels.extend([grade_8, grade_10])
     dean.grade_levels.extend([grade_8, grade_10])
     teacher.grade_levels.append(grade_10)
     second_teacher.grade_levels.append(grade_8)
+    third_teacher.grade_levels.append(grade_9)
 
     parent_user = make_user("parent@sms.example.com", "parent")
     parent = Parent(
@@ -72,6 +75,17 @@ def seed_demo_data():
         emergency_contact="+959444555666",
     )
     db.session.add(second_parent)
+
+    third_parent_user = make_user("parent3@sms.example.com", "parent")
+    third_parent = Parent(
+        user=third_parent_user,
+        full_name="Daw Khin Mar",
+        phone="+959777888999",
+        address="No. 24, University Avenue, Yangon",
+        relationship="Mother",
+        emergency_contact="+959222333444",
+    )
+    db.session.add(third_parent)
 
     student_user = make_user("student@sms.example.com", "student")
     student = Student(
@@ -109,16 +123,43 @@ def seed_demo_data():
         emergency_contact_phone="+959444555666",
         medical_notes="",
     )
+    fourth_student_user = make_user("student4@sms.example.com", "student")
+    fourth_student = Student(
+        user=fourth_student_user,
+        full_name="Su Myat Noe",
+        year_group="Grade 9",
+        date_of_birth=date(2011, 11, 3),
+        student_code="S-3001",
+        address="No. 24, University Avenue, Yangon",
+        emergency_contact_name="Daw Khin Mar",
+        emergency_contact_phone="+959222333444",
+        medical_notes="Peanut allergy",
+    )
+    fifth_student_user = make_user("student5@sms.example.com", "student")
+    fifth_student = Student(
+        user=fifth_student_user,
+        full_name="Kaung Htet",
+        year_group="Grade 9",
+        date_of_birth=date(2011, 7, 18),
+        student_code="S-3002",
+        address="No. 24, University Avenue, Yangon",
+        emergency_contact_name="Daw Khin Mar",
+        emergency_contact_phone="+959222333444",
+        medical_notes="",
+    )
     parent.students.extend([student, sibling])
     second_parent.students.append(other_student)
+    third_parent.students.extend([fourth_student, fifth_student])
 
     maths = SchoolClass(teacher=teacher, name="Grade 10A Mathematics", subject="Mathematics", year_group="Grade 10", section="A", room="B203")
     science = SchoolClass(teacher=teacher, name="Grade 10A Science", subject="Science", year_group="Grade 10", section="A", room="Lab 1")
     english = SchoolClass(teacher=second_teacher, name="Grade 8A English", subject="English", year_group="Grade 8", section="A", room="C102")
+    grade_9_maths = SchoolClass(teacher=third_teacher, name="Grade 9A Mathematics", subject="Mathematics", year_group="Grade 9", section="A", room="B105")
     maths.students.extend([student, sibling])
     science.students.extend([student, sibling])
     english.students.append(other_student)
-    db.session.add_all([admin, student, sibling, other_student, maths, science, english])
+    grade_9_maths.students.extend([fourth_student, fifth_student])
+    db.session.add_all([admin, student, sibling, other_student, fourth_student, fifth_student, maths, science, english, grade_9_maths])
     db.session.flush()
 
     slots = [
@@ -127,11 +168,13 @@ def seed_demo_data():
         Timetable(school_class=maths, day_of_week="Wednesday", start_time=time(11), end_time=time(12), period="Period 3"),
         Timetable(school_class=science, day_of_week="Friday", start_time=time(13), end_time=time(14), period="Period 5"),
         Timetable(school_class=english, day_of_week="Monday", start_time=time(10), end_time=time(11), period="Period 2"),
+        Timetable(school_class=grade_9_maths, day_of_week="Thursday", start_time=time(9), end_time=time(10), period="Period 1"),
     ]
     assignments = [
         Assignment(school_class=maths, title="Algebra Quiz", max_mark=100, weight_pct=20, due_date=date.today() + timedelta(days=7)),
         Assignment(school_class=science, title="Forces Worksheet", max_mark=50, weight_pct=10, due_date=date.today() + timedelta(days=10)),
         Assignment(school_class=english, title="Reading Journal", max_mark=40, weight_pct=15, due_date=date.today() + timedelta(days=5)),
+        Assignment(school_class=grade_9_maths, title="Geometry Project", max_mark=100, weight_pct=25, due_date=date.today() + timedelta(days=14)),
     ]
     db.session.add_all(slots + assignments)
     db.session.flush()
@@ -165,11 +208,27 @@ def seed_demo_data():
             )
         )
 
+    for target_student, statuses in [
+        (fourth_student, ["present", "present", "late", "present"]),
+        (fifth_student, ["present", "absent", "present", "present"]),
+    ]:
+        for offset, status in enumerate(statuses):
+            db.session.add(
+                Attendance(
+                    school_class=grade_9_maths,
+                    student=target_student,
+                    session_date=date.today() - timedelta(days=offset),
+                    status=status,
+                )
+            )
+
     for target_student, assignment, mark in [
         (student, assignments[0], 78),
         (student, assignments[1], 41),
         (sibling, assignments[0], 64),
         (other_student, assignments[2], 30),
+        (fourth_student, assignments[3], 86),
+        (fifth_student, assignments[3], 72),
     ]:
         db.session.add(
             Grade(
@@ -200,10 +259,31 @@ def seed_demo_data():
         )
     )
     db.session.add(
+        LeaveRequest(
+            student=fourth_student,
+            requested_by=third_parent_user,
+            start_date=date.today() + timedelta(days=8),
+            end_date=date.today() + timedelta(days=9),
+            reason="Family commitment",
+            status="pending",
+        )
+    )
+    db.session.add(
         Notice(
             title="Parent meeting week",
             body="Parent meetings will be scheduled by grade level next week.",
             audience="parents",
+            status="approved",
+            requested_by=dean.user,
+            approved_by=headmaster.user,
+            approved_at=datetime.utcnow(),
+        )
+    )
+    db.session.add(
+        Notice(
+            title="Science and mathematics showcase",
+            body="Student project exhibits open in the main hall on Friday afternoon.",
+            audience="all",
             status="approved",
             requested_by=dean.user,
             approved_by=headmaster.user,

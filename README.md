@@ -4,7 +4,7 @@ Flask implementation of the CET300 School Management System specification. The p
 
 ## Features
 
-- Four roles: administrator, teacher, parent, student
+- Six roles: administrator, headmaster, dean, teacher, parent, student
 - Flask-Login authentication with hashed passwords
 - CSRF-protected Flask-WTF forms
 - SQLAlchemy models for all 11 ERD entities
